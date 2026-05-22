@@ -1,0 +1,125 @@
+{% extends "base.html" %}
+{% block title %}ダッシュボード | Kintai{% endblock %}
+
+{% block content %}
+<div class="page" style="display: flex; flex-direction: column; gap: 24px;">
+
+  <!-- ページヘッダー -->
+  <div style="display: flex; justify-content: space-between; align-items: flex-end;">
+    <div>
+      <p style="font-size: 14px; color: var(--ink3); font-style: italic;">{{ today_label }}</p>
+      <h2 style="font-size: 34px; font-weight: 700;">こんにちは、{{ user.name }}さん</h2>
+    </div>
+  </div>
+
+  <!-- 上段：今日カード + サマリータイル -->
+  <div style="display: grid; grid-template-columns: 420px 1fr; gap: 24px;">
+
+    <!-- 今日のステータスカード -->
+    <div class="card" style="padding: 24px; display: flex; flex-direction: column; gap: 14px; box-shadow: 4px 4px 0 var(--ink);">
+      <div style="display: flex; align-items: center; justify-content: space-between;">
+        <span style="font-size: 18px; font-weight: 700;">今日のステータス</span>
+        <span class="badge {% if today_status == '未出勤' %}badge--neutral{% endif %}">{{ today_status }}</span>
+      </div>
+
+      <div style="display: flex; gap: 32px;">
+        <div>
+          <p style="font-size: 12px; color: var(--ink3);">出勤</p>
+          <p style="font-size: 28px; font-weight: 700;">{{ clock_in or "--:--" }}</p>
+        </div>
+        <div>
+          <p style="font-size: 12px; color: var(--ink3);">退勤</p>
+          <p style="font-size: 28px; font-weight: 700; color: {% if clock_out %}var(--ink){% else %}var(--ink3){% endif %};">
+            {{ clock_out or "--:--" }}
+          </p>
+        </div>
+      </div>
+
+      {% if today_status == '出勤中' %}
+      <p style="font-size: 13px; color: var(--ink2);">
+        現在の勤務時間
+        <span class="hl"><span>{{ elapsed }}</span></span>
+      </p>
+      {% endif %}
+
+      <div style="margin-top: auto;">
+        {% if today_status == '未出勤' %}
+        <form method="post" action="/punch/clock-in">
+          <button type="submit" class="btn btn--accent" style="font-size: 22px; height: 56px;">出勤する</button>
+        </form>
+        {% elif today_status == '出勤中' %}
+        <form method="post" action="/punch/clock-out">
+          <button type="submit" class="btn btn--accent" style="font-size: 22px; height: 56px;">退勤する</button>
+        </form>
+        {% else %}
+        <button class="btn" disabled style="font-size: 18px; height: 56px; opacity: 0.5;">本日は退勤済</button>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- サマリータイル 2×2 -->
+    <div style="display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr 1fr; gap: 16px;">
+      <div class="stat-tile" style="height: 140px;">
+        <span class="stat-tile__label">総勤務時間</span>
+        <span class="stat-tile__value">{{ monthly.total_hours }}</span>
+        <span class="stat-tile__sub">今月</span>
+      </div>
+      <div class="stat-tile" style="height: 140px;">
+        <span class="stat-tile__label">出勤日数</span>
+        <span class="stat-tile__value">{{ monthly.work_days }}日</span>
+        <span class="stat-tile__sub">/ {{ monthly.total_work_days }}営業日</span>
+      </div>
+      <div class="stat-tile" style="height: 140px;">
+        <span class="stat-tile__label">想定給与</span>
+        <span class="stat-tile__value" style="font-size: 28px;">¥{{ monthly.estimated_salary | format_currency }}</span>
+        <span class="stat-tile__sub">時給 ¥{{ user.yen_per_hour | format_currency }}</span>
+      </div>
+      <div class="stat-tile" style="height: 140px;">
+        <span class="stat-tile__label">残業時間</span>
+        <span class="stat-tile__value">{{ monthly.overtime_hours }}</span>
+        <span class="stat-tile__sub">今月累計</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- 下段：棒グラフ + 直近勤務 -->
+  <div style="display: grid; grid-template-columns: 1fr 420px; gap: 24px;">
+
+    <!-- 日別勤務時間グラフ -->
+    <div class="card" style="padding: 18px 24px; display: flex; flex-direction: column; gap: 10px; height: 240px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 16px; font-weight: 700;">今月の勤務時間</span>
+        <span style="font-size: 12px; color: var(--ink3); font-style: italic;">日別 (時間)</span>
+      </div>
+      <div class="bar-chart" style="align-items: flex-end; flex: 1; padding-top: 8px;">
+        {% for bar in daily_bars %}
+        <div class="bar-chart__bar">
+          <div
+            class="bar-chart__fill {% if bar.accent %}bar-chart__fill--accent{% endif %}"
+            style="height: {{ bar.height_px }}px;"
+          ></div>
+          <span class="bar-chart__label">{{ bar.label }}</span>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- 直近の勤務 -->
+    <div class="card" style="padding: 18px 22px; display: flex; flex-direction: column; gap: 8px; height: 240px;">
+      <div style="display: flex; justify-content: space-between; align-items: center;">
+        <span style="font-size: 16px; font-weight: 700;">直近の勤務</span>
+        <a href="/history" style="font-size: 12px; color: var(--ink3); font-style: italic; text-decoration: none; border-bottom: 1px solid var(--ink3);">もっと見る →</a>
+      </div>
+      {% for r in recent_records %}
+      <div style="display: grid; grid-template-columns: 90px 60px 60px 1fr; gap: 8px; padding: 4px 0; {% if not loop.last %}border-bottom: 1px dashed var(--ink3);{% endif %}">
+        <span style="font-size: 13px; color: var(--ink2);">{{ r.date_label }}</span>
+        <span style="font-size: 13px;">{{ r.clock_in or "--" }}</span>
+        <span style="font-size: 13px;">{{ r.clock_out or "--" }}</span>
+        <span style="font-size: 13px; font-weight: 700; text-align: right;">{{ r.duration_label }}</span>
+      </div>
+      {% endfor %}
+    </div>
+
+  </div>
+</div>
+{% endblock %}

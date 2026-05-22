@@ -1,0 +1,244 @@
+{% extends "base.html" %}
+{% block title %}勤務履歴 | Kintai{% endblock %}
+
+{% block content %}
+<div
+  x-data="historyPage()"
+  style="display: flex; flex-direction: column; gap: 0;"
+>
+
+  <!-- コントロールバー -->
+  <div style="display: flex; align-items: center; gap: 14px; padding: 16px 32px; border-bottom: 1px dashed var(--ink3);">
+    <a href="/history?year={{ prev_year }}&month={{ prev_month }}" class="btn btn--ghost btn--sm" style="width: auto; padding: 6px 14px; font-size: 20px;">‹</a>
+    <h2 style="font-size: 24px; font-weight: 700;">{{ year }}年 {{ month }}月</h2>
+    <a href="/history?year={{ next_year }}&month={{ next_month }}" class="btn btn--ghost btn--sm" style="width: auto; padding: 6px 14px; font-size: 20px;">›</a>
+    <span style="font-size: 13px; color: var(--ink3); font-style: italic; margin-left: auto;">
+      {{ monthly.work_days }}日出勤 · {{ monthly.total_hours }}
+    </span>
+  </div>
+
+  <!-- カレンダー + サイドパネル -->
+  <div style="display: flex; gap: 24px; padding: 24px 32px; height: calc(100vh - 130px);">
+
+    <!-- カレンダー -->
+    <div style="flex: 1; display: flex; flex-direction: column; gap: 14px; min-width: 0;">
+      <!-- 曜日ヘッダー -->
+      <div class="cal-grid" style="margin-bottom: 0;">
+        <div class="cal-header cal-header--sun">日</div>
+        <div class="cal-header">月</div>
+        <div class="cal-header">火</div>
+        <div class="cal-header">水</div>
+        <div class="cal-header">木</div>
+        <div class="cal-header">金</div>
+        <div class="cal-header cal-header--sat">土</div>
+      </div>
+
+      <!-- 日付グリッド -->
+      <div class="cal-grid" style="flex: 1; grid-template-rows: repeat(6, 1fr);">
+        {% for cell in calendar_cells %}
+        {% if cell.day %}
+        <div
+          class="cal-cell
+            {% if cell.is_today %}cal-cell--today{% endif %}
+            {% if cell.is_weekend %}{% endif %}"
+          :class="{ 'cal-cell--selected': selectedDay === {{ cell.day }} }"
+          @click="selectDay({{ cell.day }}, {{ cell.record | tojson }})"
+          style="cursor: pointer;"
+        >
+          <span
+            class="cal-cell__day {% if cell.col == 0 %}cal-cell__day--sun{% elif cell.col == 6 %}cal-cell__day--sat{% endif %}"
+            style="font-weight: {% if cell.is_today %}700{% else %}400{% endif %};"
+          >{{ cell.day }}</span>
+
+          {% if cell.record %}
+          <div style="position: absolute; bottom: 6px; left: 6px; right: 6px;">
+            <span class="cal-cell__hours">{{ cell.record.work_hours_label }}</span>
+            <div class="cal-cell__bar">
+              <div class="cal-cell__bar-fill" style="width: {{ cell.record.bar_pct }}%;"></div>
+            </div>
+          </div>
+          {% endif %}
+        </div>
+        {% else %}
+        <div class="cal-cell cal-cell--empty"></div>
+        {% endif %}
+        {% endfor %}
+      </div>
+    </div>
+
+    <!-- サイドパネル -->
+    <div style="width: 320px; display: flex; flex-direction: column; gap: 14px; flex-shrink: 0;">
+
+      <!-- 選択日の詳細 -->
+      <div class="card" style="padding: 18px; display: flex; flex-direction: column; gap: 10px;">
+        <span style="font-size: 12px; color: var(--ink3); font-style: italic;">選択中</span>
+        <h3 style="font-size: 22px; font-weight: 700;" x-text="panelTitle">日付を選択してください</h3>
+
+        <template x-if="selectedRecord">
+          <div>
+            <template x-if="selectedRecord.status">
+              <span class="badge" x-text="selectedRecord.status" style="margin-bottom: 8px; display: inline-flex;"></span>
+            </template>
+
+            <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 6px;">
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--ink3); padding: 4px 0;">
+                <span style="font-size: 13px; color: var(--ink2);">出勤</span>
+                <span style="font-size: 14px; font-weight: 700;" x-text="selectedRecord.clock_in || '--:--'"></span>
+              </div>
+              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--ink3); padding: 4px 0;">
+                <span style="font-size: 13px; color: var(--ink2);">退勤</span>
+                <span style="font-size: 14px; font-weight: 700;"
+                  :style="selectedRecord.clock_out ? '' : 'color: var(--ink3);'"
+                  x-text="selectedRecord.clock_out || '--:--'"></span>
+              </div>
+              <div style="display: flex; justify-content: space-between; padding: 4px 0;">
+                <span style="font-size: 13px; color: var(--ink2);">勤務</span>
+                <span style="font-size: 14px; font-weight: 700;" x-text="selectedRecord.duration_label || '--'"></span>
+              </div>
+            </div>
+
+            <button
+              @click="openEdit()"
+              class="btn btn--accent"
+              style="margin-top: 8px; height: 40px; font-size: 15px;"
+            >この日を編集 ✎</button>
+          </div>
+        </template>
+
+        <template x-if="!selectedRecord">
+          <p style="font-size: 13px; color: var(--ink3); font-style: italic;">カレンダーの日付をクリックしてください</p>
+        </template>
+      </div>
+
+      <!-- 月次サマリー -->
+      <div class="card" style="padding: 18px; display: flex; flex-direction: column; gap: 8px;">
+        <span style="font-size: 14px; font-weight: 700;">{{ month }}月の合計</span>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="font-size: 13px; color: var(--ink2);">勤務時間</span>
+          <span style="font-size: 14px; font-weight: 700;">{{ monthly.total_hours }}</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="font-size: 13px; color: var(--ink2);">出勤日数</span>
+          <span style="font-size: 14px; font-weight: 700;">{{ monthly.work_days }}日</span>
+        </div>
+        <div style="display: flex; justify-content: space-between;">
+          <span style="font-size: 13px; color: var(--ink2);">残業</span>
+          <span style="font-size: 14px; font-weight: 700;">{{ monthly.overtime_hours }}</span>
+        </div>
+        <div class="divider"></div>
+        <div style="display: flex; justify-content: space-between; align-items: center;">
+          <span style="font-size: 13px; color: var(--ink2);">想定給与</span>
+          <span style="font-size: 18px; font-weight: 700;">
+            <span class="hl"><span>¥{{ monthly.estimated_salary | format_currency }}</span></span>
+          </span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 編集ダイアログ -->
+  <div
+    x-show="editOpen"
+    x-transition.opacity
+    class="modal-overlay"
+    @click.self="editOpen = false"
+    style="display: none;"
+  >
+    <div class="modal-box" @click.stop>
+      <!-- ヘッダー -->
+      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px;">
+        <div>
+          <p style="font-size: 13px; color: var(--ink3);">勤務記録の編集</p>
+          <h3 style="font-size: 26px; font-weight: 700;" x-text="panelTitle"></h3>
+        </div>
+        <button @click="editOpen = false" style="background: none; border: none; font-size: 22px; color: var(--ink3); cursor: pointer;">×</button>
+      </div>
+
+      <form
+        method="post"
+        :action="`/history/edit/${editYear}/${editMonth}/${editDay}`"
+        style="display: flex; flex-direction: column; gap: 18px;"
+      >
+        <!-- 出退勤時刻 -->
+        <div style="display: flex; gap: 16px;">
+          <div class="field" style="flex: 1;">
+            <label class="field__label">出勤時刻</label>
+            <input class="field__input" type="time" name="clock_in"
+              :value="selectedRecord && selectedRecord.clock_in_raw" />
+          </div>
+          <div class="field" style="flex: 1;">
+            <label class="field__label">退勤時刻</label>
+            <input class="field__input" type="time" name="clock_out"
+              :value="selectedRecord && selectedRecord.clock_out_raw" />
+          </div>
+        </div>
+
+        <!-- 勤務時間（表示のみ） -->
+        <div class="card card--accent" style="padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;">
+          <div>
+            <p style="font-size: 11px; color: var(--ink2);">勤務時間 (自動計算)</p>
+            <p style="font-size: 28px; font-weight: 700;" x-text="selectedRecord ? selectedRecord.duration_label : '--'"></p>
+          </div>
+          <div style="text-align: right;">
+            <p style="font-size: 11px; color: var(--ink2);">うち残業</p>
+            <p style="font-size: 20px; font-weight: 700;" x-text="selectedRecord ? selectedRecord.overtime_label : '--'"></p>
+          </div>
+        </div>
+
+        <!-- 備考 -->
+        <div class="field">
+          <label class="field__label">備考</label>
+          <textarea class="field__input" name="note" rows="3"
+            style="resize: vertical; height: 90px;"
+            placeholder="例）クライアント打ち合わせ後、資料修正で残業"
+            x-text="selectedRecord && selectedRecord.note"
+          ></textarea>
+        </div>
+
+        <p style="font-size: 12px; color: var(--ink3); font-style: italic;">※ 変更履歴は管理者に通知されます</p>
+
+        <div style="display: flex; gap: 12px; margin-top: 6px;">
+          <button type="button" @click="editOpen = false" class="btn btn--ghost" style="flex: 1;">キャンセル</button>
+          <button type="submit" class="btn btn--accent" style="flex: 1; font-size: 18px;">保存する</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  /* Jinja2で事前にレンダリングした値をJS変数に代入 */
+  const PAGE_YEAR  = {{ year }};
+  const PAGE_MONTH = {{ month }};
+
+  function historyPage() {
+    return {
+      selectedDay: null,
+      selectedRecord: null,
+      panelTitle: '日付を選択してください',
+      editOpen: false,
+      editYear: PAGE_YEAR,
+      editMonth: PAGE_MONTH,
+      editDay: null,
+
+      selectDay(day, record) {
+        this.selectedDay = day;
+        this.selectedRecord = record;
+        this.editDay = day;
+        /* 日付ラベルを更新 */
+        const weekdays = ['日','月','火','水','木','金','土'];
+        const d = new Date(PAGE_YEAR, PAGE_MONTH - 1, day);
+        this.panelTitle = PAGE_MONTH + '月' + day + '日 (' + weekdays[d.getDay()] + ')';
+      },
+
+      openEdit() {
+        if (this.selectedRecord) this.editOpen = true;
+      }
+    };
+  }
+</script>
+{% endblock %}

@@ -1,0 +1,150 @@
+{% extends "base.html" %}
+{% block title %}打刻 | Kintai{% endblock %}
+
+{% block content %}
+<div
+  x-data="punchClock()"
+  x-init="start()"
+  style="display: flex; flex-direction: column; align-items: center; justify-content: center;
+         padding: 40px; gap: 28px; min-height: calc(100vh - 57px);"
+>
+  <!-- 日付 -->
+  <p style="font-size: 16px; color: var(--ink3); font-style: italic;">{{ date_label }}</p>
+
+  <!-- 巨大時計 -->
+  <div style="position: relative;">
+    <span
+      x-text="time"
+      style="font-size: 120px; font-weight: 700; letter-spacing: 4px; line-height: 1; font-family: var(--font-main);"
+    ></span>
+  </div>
+
+  <!-- ステータスバッジ -->
+  <span class="badge {% if today_status == '未出勤' %}badge--neutral{% endif %}">
+    {{ today_status }}
+  </span>
+
+  <!-- 出勤時刻 / 経過時間 / 退勤時刻 -->
+  <div style="display: flex; gap: 32px; margin-top: 8px;">
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+      <span style="font-size: 13px; color: var(--ink3);">出勤時刻</span>
+      <span style="font-size: 32px; font-weight: 700;">{{ clock_in or "--:--" }}</span>
+    </div>
+    <div style="width: 1px; background: var(--ink3);"></div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+      <span style="font-size: 13px; color: var(--ink3);">経過時間</span>
+      <span style="font-size: 32px; font-weight: 700;">
+        <span class="hl" x-text="elapsed"><span>{{ elapsed or "--" }}</span></span>
+      </span>
+    </div>
+    <div style="width: 1px; background: var(--ink3);"></div>
+    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
+      <span style="font-size: 13px; color: var(--ink3);">退勤時刻</span>
+      <span style="font-size: 32px; font-weight: 700; color: {% if clock_out %}var(--ink){% else %}var(--ink3){% endif %};">
+        {{ clock_out or "--:--" }}
+      </span>
+    </div>
+  </div>
+
+  <!-- メインアクションボタン -->
+  <div style="position: relative; margin-top: 16px;">
+    {% if today_status == '未出勤' %}
+    <form method="post" action="/punch/clock-in">
+      <button type="submit" class="btn btn--accent btn--lg"
+        style="width: 420px; height: 120px; font-size: 40px; box-shadow: 6px 6px 0 var(--ink);">
+        出勤する
+      </button>
+    </form>
+
+    {% elif today_status == '出勤中' %}
+    <!-- 退勤確認モーダル -->
+    <div x-data="{ open: false }">
+      <button
+        @click="open = true"
+        class="btn btn--accent btn--lg"
+        style="width: 420px; height: 120px; font-size: 40px; box-shadow: 6px 6px 0 var(--ink);"
+      >
+        退勤する
+      </button>
+
+      <!-- オーバーレイ -->
+      <div
+        x-show="open"
+        x-transition.opacity
+        class="modal-overlay"
+        @click.self="open = false"
+        style="display: none;"
+      >
+        <div class="modal-box" style="width: 400px; text-align: center;">
+          <h2 style="font-size: 22px; font-weight: 700; margin-bottom: 12px;">退勤しますか？</h2>
+          <p style="font-size: 14px; color: var(--ink2); margin-bottom: 16px;">退勤時刻として下記が記録されます。</p>
+
+          <div class="card card--accent" style="padding: 16px; margin-bottom: 20px;">
+            <p style="font-size: 11px; color: var(--ink2);">退勤時刻</p>
+            <p style="font-size: 28px; font-weight: 700;" x-text="timeShort"></p>
+            <p style="font-size: 11px; color: var(--ink2);">勤務 <span x-text="elapsed"></span></p>
+          </div>
+
+          <div style="display: flex; gap: 10px;">
+            <button @click="open = false" class="btn btn--ghost" style="flex: 1;">戻る</button>
+            <form method="post" action="/punch/clock-out" style="flex: 1;">
+              <button type="submit" class="btn btn--accent" style="width: 100%;">確定</button>
+            </form>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    {% else %}
+    <button class="btn" disabled
+      style="width: 420px; height: 120px; font-size: 28px; opacity: 0.5; box-shadow: 6px 6px 0 var(--ink);">
+      本日は退勤済
+    </button>
+    {% endif %}
+  </div>
+
+  {% if today_status == '出勤中' %}
+  <p style="font-size: 13px; color: var(--ink2); font-style: italic;">※ 押すと確認ダイアログが表示されます</p>
+  {% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function punchClock() {
+    /* サーバーから渡された出勤時刻（HH:MM形式、未出勤は null） */
+    const clockInStr = {{ clock_in | tojson }};
+
+    return {
+      time: '',
+      timeShort: '',
+      elapsed: {{ elapsed | tojson or '""' }},
+
+      start() {
+        this.tick();
+        setInterval(() => this.tick(), 1000);
+      },
+
+      tick() {
+        const now = new Date();
+        const hh = String(now.getHours()).padStart(2, '0');
+        const mm = String(now.getMinutes()).padStart(2, '0');
+        const ss = String(now.getSeconds()).padStart(2, '0');
+        this.time = `${hh} : ${mm} : ${ss}`;
+        this.timeShort = `${hh}:${mm}`;
+
+        /* 経過時間の更新（出勤中のみ） */
+        if (clockInStr) {
+          const [ih, im] = clockInStr.split(':').map(Number);
+          const startMs = new Date();
+          startMs.setHours(ih, im, 0, 0);
+          const diffSec = Math.max(0, Math.floor((now - startMs) / 1000));
+          const dh = Math.floor(diffSec / 3600);
+          const dm = Math.floor((diffSec % 3600) / 60);
+          this.elapsed = `${dh}h ${String(dm).padStart(2, '0')}m`;
+        }
+      }
+    };
+  }
+</script>
+{% endblock %}
