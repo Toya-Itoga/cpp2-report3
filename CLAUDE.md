@@ -13,7 +13,7 @@
 - `src/services/`         - サービス層
 - `src/repositories/`     - リポジトリ層
 - `src/utils/`            - ユーティリティ関数定義
-- `src/template/`         - HTMLファイル
+- `src/templates/`        - HTMLファイル
 - `src/static/css/`       - CSSファイル
 - `src/static/js/`        - JavaScriptファイル
 - `config/`               - 設定・ドキュメント
@@ -53,6 +53,19 @@
 ## 環境設定
 - ローカル開発時はダミーユーザーを返すこと
 - ENV=developmentの場合はDynamoDBへの認証をスキップしてダミーユーザーを使用すること
+
+## 環境変数
+- ENV: 実行環境（development / production）
+- DYNAMODB_ENDPOINT: DynamoDBエンドポイント（ローカル: http://localhost:5434）
+- DYNAMODB_REGION: AWSリージョン（ap-northeast-1）
+- AWS_ACCESS_KEY_ID: AWSアクセスキー
+- AWS_SECRET_ACCESS_KEY: AWSシークレットキー
+- USER_TABLE_NAME: Userテーブル名
+- WORK_TABLE_NAME: Workテーブル名
+- JWT_SECRET_KEY: JWT署名キー
+- JWT_ALGORITHM: JWTアルゴリズム（HS256）
+- JWT_EXPIRE_HOURS: トークン有効期間（6）
+- PORT: サーバーポート番号（8002）
 
 ## ダミーユーザー
 - user_id: dummy_user
