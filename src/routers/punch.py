@@ -1,7 +1,9 @@
 """打刻ルーター"""
 
+import os
 from datetime import date, datetime
 
+import boto3
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
@@ -13,6 +15,15 @@ router = APIRouter(prefix="/punch", tags=["punch"])
 templates = Jinja2Templates(directory="src/templates")
 templates.env.filters["format_currency"] = format_currency
 
+WORK_TABLE_NAME = os.getenv("WORK_TABLE_NAME")
+_work_table = None
+if WORK_TABLE_NAME:
+    _work_table = boto3.resource(
+        "dynamodb",
+        region_name=os.getenv("DYNAMODB_REGION", "ap-northeast-1"),
+        endpoint_url=os.getenv("DYNAMODB_ENDPOINT"),
+    ).Table(WORK_TABLE_NAME)
+
 
 @router.get("", response_class=HTMLResponse)
 async def punch_page(request: Request, user: dict = Depends(get_current_user)):
@@ -20,10 +31,21 @@ async def punch_page(request: Request, user: dict = Depends(get_current_user)):
     weekday_ja = ["月", "火", "水", "木", "金", "土", "日"]
     date_label = f"{today.year}年 {today.month}月 {today.day}日 ({weekday_ja[today.weekday()]})"
 
-    # TODO: DynamoDBから当日の打刻レコードを取得する
-    clock_in     = "09:02"   # ダミー
-    clock_out    = None       # ダミー
-    today_status = "出勤中"
+    record = {}
+    if _work_table is not None:
+        response = _work_table.get_item(
+            Key={
+                "PK": f"USER#{user['user_id']}",
+                "SK": f"WORK#{today:%Y%m%d}",
+            },
+            ProjectionExpression="clock_in, clock_out, #status",
+            ExpressionAttributeNames={"#status": "status"},
+        )
+        record = response.get("Item", {})
+
+    clock_in     = record.get("clock_in")
+    clock_out    = record.get("clock_out")
+    today_status = record.get("status") or ("出勤中" if clock_in and not clock_out else "退勤済" if clock_out else "未出勤")
 
     elapsed = None
     if clock_in and not clock_out:
