@@ -16,6 +16,7 @@
 - `src/templates/`        - HTMLファイル
 - `src/static/css/`       - CSSファイル
 - `src/static/js/`        - JavaScriptファイル
+- `src/database.py`       - DB接続・テーブル定義
 - `config/`               - 設定・ドキュメント
 - `scripts/`              - 開発補助スクリプト
 - `tests/`                - テストコード
