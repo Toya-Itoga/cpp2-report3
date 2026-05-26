@@ -1,7 +1,7 @@
 """打刻ルーター"""
 
 import os
-from datetime import date, datetime
+from datetime import date, datetime  # datetime は clock_in/clock_out エンドポイントで使用
 
 import boto3
 from botocore.exceptions import ClientError
@@ -50,15 +50,6 @@ async def punch_page(request: Request, user: dict = Depends(get_current_user)):
     clock_out    = record.get("clock_out")
     today_status = record.get("status") or ("出勤中" if clock_in and not clock_out else "退勤済" if clock_out else "未出勤")
 
-    elapsed = None
-    if clock_in and not clock_out:
-        now = datetime.now()
-        h, m = map(int, clock_in.split(":"))
-        start = now.replace(hour=h, minute=m, second=0, microsecond=0)
-        diff = max(0, int((now - start).total_seconds()))
-        dh, dm = divmod(diff // 60, 60)
-        elapsed = f"{dh}h {dm:02d}m"
-
     return templates.TemplateResponse(request, "punch.html", {
         "user":         user,
         "active":       "punch",
@@ -66,7 +57,6 @@ async def punch_page(request: Request, user: dict = Depends(get_current_user)):
         "today_status": today_status,
         "clock_in":     clock_in,
         "clock_out":    clock_out,
-        "elapsed":      elapsed,
     })
 
 

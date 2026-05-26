@@ -24,18 +24,11 @@
     {{ today_status }}
   </span>
 
-  <!-- 出勤時刻 / 経過時間 / 退勤時刻 -->
+  <!-- 出勤時刻 / 退勤時刻 -->
   <div style="display: flex; gap: 32px; margin-top: 8px;">
     <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
       <span style="font-size: 13px; color: var(--ink3);">出勤時刻</span>
       <span style="font-size: 32px; font-weight: 700;">{{ clock_in or "--:--" }}</span>
-    </div>
-    <div style="width: 1px; background: var(--ink3);"></div>
-    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-      <span style="font-size: 13px; color: var(--ink3);">経過時間</span>
-      <span style="font-size: 32px; font-weight: 700;">
-        <span class="hl" x-text="elapsed"><span>{{ elapsed or "--" }}</span></span>
-      </span>
     </div>
     <div style="width: 1px; background: var(--ink3);"></div>
     <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
@@ -118,7 +111,7 @@
     return {
       time: '',
       timeShort: '',
-      elapsed: {{ elapsed | tojson or '""' }},
+      elapsed: '',  /* クライアントサイドで tick() ごとに更新する */
 
       start() {
         this.tick();
