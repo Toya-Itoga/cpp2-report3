@@ -34,7 +34,7 @@
       </div>
 
       <!-- 日付グリッド -->
-      <div class="cal-grid" style="flex: 1; grid-template-rows: repeat(6, 1fr);">
+      <div id="cal-grid" class="cal-grid" style="flex: 1; grid-template-rows: repeat(6, 1fr);">
         {% for cell in calendar_cells %}
         {% if cell.day %}
         <div
@@ -74,39 +74,50 @@
         <span style="font-size: 12px; color: var(--ink3); font-style: italic;">選択中</span>
         <h3 style="font-size: 22px; font-weight: 700;" x-text="panelTitle">日付を選択してください</h3>
 
-        <template x-if="selectedRecord">
-          <div>
-            <template x-if="selectedRecord.status">
-              <span class="badge" x-text="selectedRecord.status" style="margin-bottom: 8px; display: inline-flex;"></span>
-            </template>
-
-            <div style="margin-top: 6px; display: flex; flex-direction: column; gap: 6px;">
-              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--ink3); padding: 4px 0;">
-                <span style="font-size: 13px; color: var(--ink2);">出勤</span>
-                <span style="font-size: 14px; font-weight: 700;" x-text="selectedRecord.clock_in || '--:--'"></span>
-              </div>
-              <div style="display: flex; justify-content: space-between; border-bottom: 1px dashed var(--ink3); padding: 4px 0;">
-                <span style="font-size: 13px; color: var(--ink2);">退勤</span>
-                <span style="font-size: 14px; font-weight: 700;"
-                  :style="selectedRecord.clock_out ? '' : 'color: var(--ink3);'"
-                  x-text="selectedRecord.clock_out || '--:--'"></span>
-              </div>
-              <div style="display: flex; justify-content: space-between; padding: 4px 0;">
-                <span style="font-size: 13px; color: var(--ink2);">勤務</span>
-                <span style="font-size: 14px; font-weight: 700;" x-text="selectedRecord.duration_label || '--'"></span>
-              </div>
-            </div>
-
-            <button
-              @click="openEdit()"
-              class="btn btn--accent"
-              style="margin-top: 8px; height: 40px; font-size: 15px;"
-            >この日を編集 ✎</button>
-          </div>
+        <!-- 日付未選択時 -->
+        <template x-if="selectedDay === null">
+          <p style="font-size: 13px; color: var(--ink3); font-style: italic;">カレンダーの日付をクリックしてください</p>
         </template>
 
-        <template x-if="!selectedRecord">
-          <p style="font-size: 13px; color: var(--ink3); font-style: italic;">カレンダーの日付をクリックしてください</p>
+        <!-- 日付選択済み：打刻修正フォーム -->
+        <template x-if="selectedDay !== null">
+          <div style="display: flex; flex-direction: column; gap: 10px;">
+            <template x-if="selectedRecord && selectedRecord.status">
+              <span class="badge" x-text="selectedRecord.status" style="display: inline-flex;"></span>
+            </template>
+
+            <form
+              @submit.prevent="saveRecord($el)"
+              style="display: flex; flex-direction: column; gap: 12px; margin-top: 4px;"
+            >
+              <div style="display: flex; gap: 12px;">
+                <div class="field" style="flex: 1;">
+                  <label class="field__label">出勤時刻</label>
+                  <input
+                    class="field__input"
+                    type="time"
+                    name="clock_in"
+                    :value="selectedRecord && selectedRecord.clock_in_raw || ''"
+                  />
+                </div>
+                <div class="field" style="flex: 1;">
+                  <label class="field__label">退勤時刻</label>
+                  <input
+                    class="field__input"
+                    type="time"
+                    name="clock_out"
+                    :value="selectedRecord && selectedRecord.clock_out_raw || ''"
+                  />
+                </div>
+              </div>
+              <button type="submit" class="btn btn--accent" style="height: 40px; font-size: 15px;">
+                保存する
+              </button>
+            </form>
+
+            <!-- HTMX 保存結果メッセージ -->
+            <div id="panel-feedback" style="min-height: 20px; font-size: 13px;"></div>
+          </div>
         </template>
       </div>
 
@@ -137,74 +148,6 @@
     </div>
   </div>
 
-  <!-- 編集ダイアログ -->
-  <div
-    x-show="editOpen"
-    x-transition.opacity
-    class="modal-overlay"
-    @click.self="editOpen = false"
-    style="display: none;"
-  >
-    <div class="modal-box" @click.stop>
-      <!-- ヘッダー -->
-      <div style="display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 18px;">
-        <div>
-          <p style="font-size: 13px; color: var(--ink3);">勤務記録の編集</p>
-          <h3 style="font-size: 26px; font-weight: 700;" x-text="panelTitle"></h3>
-        </div>
-        <button @click="editOpen = false" style="background: none; border: none; font-size: 22px; color: var(--ink3); cursor: pointer;">×</button>
-      </div>
-
-      <form
-        method="post"
-        :action="`/history/edit/${editYear}/${editMonth}/${editDay}`"
-        style="display: flex; flex-direction: column; gap: 18px;"
-      >
-        <!-- 出退勤時刻 -->
-        <div style="display: flex; gap: 16px;">
-          <div class="field" style="flex: 1;">
-            <label class="field__label">出勤時刻</label>
-            <input class="field__input" type="time" name="clock_in"
-              :value="selectedRecord && selectedRecord.clock_in_raw" />
-          </div>
-          <div class="field" style="flex: 1;">
-            <label class="field__label">退勤時刻</label>
-            <input class="field__input" type="time" name="clock_out"
-              :value="selectedRecord && selectedRecord.clock_out_raw" />
-          </div>
-        </div>
-
-        <!-- 勤務時間（表示のみ） -->
-        <div class="card card--accent" style="padding: 12px 18px; display: flex; align-items: center; justify-content: space-between;">
-          <div>
-            <p style="font-size: 11px; color: var(--ink2);">勤務時間 (自動計算)</p>
-            <p style="font-size: 28px; font-weight: 700;" x-text="selectedRecord ? selectedRecord.duration_label : '--'"></p>
-          </div>
-          <div style="text-align: right;">
-            <p style="font-size: 11px; color: var(--ink2);">うち残業</p>
-            <p style="font-size: 20px; font-weight: 700;" x-text="selectedRecord ? selectedRecord.overtime_label : '--'"></p>
-          </div>
-        </div>
-
-        <!-- 備考 -->
-        <div class="field">
-          <label class="field__label">備考</label>
-          <textarea class="field__input" name="note" rows="3"
-            style="resize: vertical; height: 90px;"
-            placeholder="例）クライアント打ち合わせ後、資料修正で残業"
-            x-text="selectedRecord && selectedRecord.note"
-          ></textarea>
-        </div>
-
-        <p style="font-size: 12px; color: var(--ink3); font-style: italic;">※ 変更履歴は管理者に通知されます</p>
-
-        <div style="display: flex; gap: 12px; margin-top: 6px;">
-          <button type="button" @click="editOpen = false" class="btn btn--ghost" style="flex: 1;">キャンセル</button>
-          <button type="submit" class="btn btn--accent" style="flex: 1; font-size: 18px;">保存する</button>
-        </div>
-      </form>
-    </div>
-  </div>
 
 </div>
 {% endblock %}
@@ -220,23 +163,27 @@
       selectedDay: null,
       selectedRecord: null,
       panelTitle: '日付を選択してください',
-      editOpen: false,
-      editYear: PAGE_YEAR,
-      editMonth: PAGE_MONTH,
-      editDay: null,
 
       selectDay(day, record) {
         this.selectedDay = day;
         this.selectedRecord = record;
-        this.editDay = day;
+        /* 保存結果メッセージをリセット */
+        const fb = document.getElementById('panel-feedback');
+        if (fb) fb.innerHTML = '';
         /* 日付ラベルを更新 */
         const weekdays = ['日','月','火','水','木','金','土'];
         const d = new Date(PAGE_YEAR, PAGE_MONTH - 1, day);
         this.panelTitle = PAGE_MONTH + '月' + day + '日 (' + weekdays[d.getDay()] + ')';
       },
 
-      openEdit() {
-        if (this.selectedRecord) this.editOpen = true;
+      /* HTMXを使ってページ遷移なしで打刻データを保存し、カレンダーを再描画する */
+      saveRecord(form) {
+        const url = `/history/edit/${PAGE_YEAR}/${PAGE_MONTH}/${this.selectedDay}`;
+        htmx.ajax('POST', url, {
+          source: form,
+          target: '#cal-grid',
+          swap: 'innerHTML',
+        });
       }
     };
   }
