@@ -1,32 +1,41 @@
 """勤務履歴ルーター"""
 
+import os
 import calendar
 from datetime import date
+from decimal import Decimal
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
+
 from fastapi.templating import Jinja2Templates
 
+from src.repositories import work_repository
 from src.routers.auth import get_current_user
-from src.utils.salary import calc_estimated_salary, format_currency
+from src.services import work_service
+from src.utils.salary import format_currency
 
 router = APIRouter(prefix="/history", tags=["history"])
 templates = Jinja2Templates(directory="src/templates")
 templates.env.filters["format_currency"] = format_currency
 
-# ダミー勤務データ（日: 勤務時間[h]）
-_DUMMY_DATA: dict[int, float] = {
-    1: 8.25, 2: 9.33, 5: 8.0, 6: 10.75, 7: 8.0, 8: 7.83, 9: 8.5,
-    12: 8.25, 13: 10.67, 14: 8.0, 15: 9.08, 16: 8.0, 19: 8.5, 20: 5.4,
-}
+WORK_TABLE_NAME = os.getenv("WORK_TABLE_NAME")
 
 
-def _build_calendar_cells(year: int, month: int, data: dict[int, float]) -> list[dict]:
-    """カレンダー表示用のセルリストを生成する"""
+def _build_calendar_cells(year: int, month: int, records: list[dict]) -> list[dict]:
+    """DynamoDB の月次レコードからカレンダー表示用のセルリストを生成する"""
     first_weekday, days_in_month = calendar.monthrange(year, month)
     # Pythonのmonthrange: 0=月曜 → 日曜始まりに変換
     start_col = (first_weekday + 1) % 7  # 0=日曜
+
+    # SK (WORK#YYYYMMDD) から日付 → レコードのマップを作成する
+    day_records: dict[int, dict] = {}
+    for r in records:
+        sk = r.get("SK", "")
+        if sk.startswith("WORK#"):
+            day = int(sk[-2:])
+            day_records[day] = r
 
     cells = []
     for i in range(6 * 7):
@@ -37,24 +46,27 @@ def _build_calendar_cells(year: int, month: int, data: dict[int, float]) -> list
 
         col      = i % 7
         is_today = (date.today() == date(year, month, day))
-        hours    = data.get(day)
+        r        = day_records.get(day)
 
         record = None
-        if hours is not None:
-            work_minutes  = int(hours * 60)
-            h, m          = divmod(work_minutes, 60)
-            bar_pct       = min(100, int((hours / 10) * 100))
+        if r is not None and r.get("status") != "休日":
+            wm = int(Decimal(str(r.get("work_minutes") or 0)))
+            om = int(Decimal(str(r.get("overtime_minutes") or 0)))
+            hours   = wm / 60
+            h, m    = divmod(wm, 60)
+            oh, oom = divmod(om, 60)
+
             record = {
                 "work_hours_label": f"{hours:.1f}h",
-                "bar_pct":          bar_pct,
-                "clock_in":         "09:02",
-                "clock_out":        None if (is_today and hours < 8) else "18:30",
-                "clock_in_raw":     "09:02",
-                "clock_out_raw":    None,
+                "bar_pct":          min(100, int((hours / 10) * 100)),
+                "clock_in":         r.get("clock_in"),
+                "clock_out":        r.get("clock_out"),
+                "clock_in_raw":     r.get("clock_in"),
+                "clock_out_raw":    r.get("clock_out"),
                 "duration_label":   f"{h}h {m:02d}m",
-                "overtime_label":   "0h 00m",
-                "status":           "出勤中" if is_today else None,
-                "note":             "",
+                "overtime_label":   f"{oh}h {oom:02d}m",
+                "status":           r.get("status"),
+                "note":             r.get("note", ""),
             }
 
         cells.append({
@@ -68,26 +80,8 @@ def _build_calendar_cells(year: int, month: int, data: dict[int, float]) -> list
     return cells
 
 
-def _monthly_summary(data: dict[int, float], yen_per_hour: int) -> dict:
-    """月次サマリーを集計する"""
-    total_minutes  = int(sum(v * 60 for v in data.values()))
-    work_days      = len(data)
-    h, m           = divmod(total_minutes, 60)
-    overtime_min   = max(0, total_minutes - work_days * 8 * 60)
-    oh, om         = divmod(overtime_min, 60)
-    salary         = calc_estimated_salary(total_minutes, yen_per_hour)
-    total_hours_f  = total_minutes / 60
-
-    return {
-        "total_hours":       f"{h}h {m:02d}m",
-        "work_days":         work_days,
-        "overtime_hours":    f"{oh}h {om:02d}m",
-        "estimated_salary":  salary,
-        "total_hours_float": total_hours_f,
-    }
-
-
 # ─── 勤務履歴一覧 ────────────────────────────────────────────────────
+
 @router.get("", response_class=HTMLResponse)
 async def history_page(
     request: Request,
@@ -107,10 +101,20 @@ async def history_page(
     next_month = month % 12 + 1
     next_year  = year + (1 if month == 12 else 0)
 
-    # TODO: DynamoDBから実データを取得する
-    data    = _DUMMY_DATA
-    cells   = _build_calendar_cells(year, month, data)
-    monthly = _monthly_summary(data, user["yen_per_hour"])
+    # 対象月の勤務レコードを全件取得する
+    records = []
+    if WORK_TABLE_NAME:
+        records = work_repository.get_monthly_records(user["user_id"], year, month)
+
+    cells   = _build_calendar_cells(year, month, records)
+    agg     = work_service.aggregate_monthly(records, user["yen_per_hour"])
+    monthly = {
+        "total_hours":       agg["total_hours_str"],
+        "work_days":         agg["work_days"],
+        "overtime_hours":    agg["overtime_str"],
+        "estimated_salary":  agg["estimated_salary"],
+        "total_hours_float": agg["total_minutes"] / 60,
+    }
 
     return templates.TemplateResponse(request, "history.html", {
         "user":           user,
@@ -127,8 +131,10 @@ async def history_page(
 
 
 # ─── 勤務記録の編集 ───────────────────────────────────────────────────
+
 @router.post("/edit/{year}/{month}/{day}")
 async def edit_record(
+    request: Request,
     year:  int,
     month: int,
     day:   int,
@@ -138,5 +144,39 @@ async def edit_record(
     user: dict = Depends(get_current_user),
 ):
     """勤務記録を更新してDynamoDBに保存する"""
-    # TODO: DynamoDBの該当日レコードを更新する
+    if WORK_TABLE_NAME:
+        target_date = date(year, month, day)
+
+        # clock_in・clock_out が揃っている場合は勤務時間を再計算する
+        work_minutes: int | None     = None
+        overtime_minutes: int | None = None
+        ci = clock_in  or None
+        co = clock_out or None
+        if ci and co:
+            work_minutes     = work_service.calc_work_minutes(ci, co)
+            overtime_minutes = work_service.calc_overtime_minutes(work_minutes)
+
+        work_repository.update_record(
+            user["user_id"],
+            target_date,
+            clock_in=ci,
+            clock_out=co,
+            work_minutes=work_minutes,
+            overtime_minutes=overtime_minutes,
+            note=note or None,
+        )
+
+    # HTMX リクエストのときはカレンダーセルを再レンダリングして返す
+    if request.headers.get("HX-Request"):
+        updated_records = []
+        if WORK_TABLE_NAME:
+            updated_records = work_repository.get_monthly_records(user["user_id"], year, month)
+        cells = _build_calendar_cells(year, month, updated_records)
+        # カレンダーセルの HTML を Jinja2 でレンダリングする
+        cells_html = templates.env.get_template("_history_calendar_cells.html").render(
+            calendar_cells=cells,
+        )
+        # OOB スワップで保存結果メッセージを panel-feedback に反映する
+        feedback_oob = '<div id="panel-feedback" hx-swap-oob="true"><span style="color: #2e7d32;">✓ 保存しました</span></div>'
+        return HTMLResponse(cells_html + feedback_oob)
     return RedirectResponse(url=f"/history?year={year}&month={month}", status_code=303)
