@@ -1,6 +1,8 @@
 """Kintai アプリ エントリーポイント"""
 
 import os
+from dotenv import load_dotenv
+load_dotenv()
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates

@@ -19,6 +19,9 @@ import sys
 # プロジェクトルートをパスに追加してsrcモジュールをimportできるようにする
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
+from dotenv import load_dotenv
+load_dotenv()
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s [%(levelname)s] %(message)s",

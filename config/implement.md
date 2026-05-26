@@ -1,13 +1,14 @@
 # implement.md
 
 ## タスク
-- src/database.pyを作成してテーブル定義とDB接続処理を定義すること
+- src/routers/punch.pyのclock_in・clock_outのTODOを実装すること
 
-## database.pyに含める内容
-- get_dynamodb(): DB接続処理（ENV=developmentの場合はローカルエンドポイントを使用）
-- create_tables(): UserテーブルとWorkテーブルの作成処理
-- UserテーブルとWorkテーブルのキー定義はrequirements.mdを参照すること
+## clock_inの処理
+- 現在時刻を取得する
+- DynamoDBにWORK#YYYYMMDDのレコードを作成する
+- clock_in・status（出勤中）を書き込む
 
-## 注意事項
-- テーブルが既に存在する場合はスキップすること
-- scripts/setup_local_db.pyからcreate_tables()を呼び出せるようにすること
+## clock_outの処理
+- DynamoDBのWORK#YYYYMMDDのレコードを更新する
+- clock_out・work_minutes・status（退勤済）を書き込む
+- work_minutes = clock_outの時刻 - clock_inの時刻（分換算）
