@@ -53,11 +53,13 @@ def update_user(
     # 更新対象フィールドを動的に組み立てる
     expressions: list[str] = []
     attr_values: dict = {}
-    attr_names: dict = {"#name": "name"}  # name は予約語なのでエイリアスが必要
+    # name は DynamoDB 予約語のため、更新するときのみエイリアスを追加する
+    attr_names: dict = {}
 
     if name is not None:
         expressions.append("#name = :name")
         attr_values[":name"] = name
+        attr_names["#name"] = "name"
 
     if email is not None:
         expressions.append("email = :email")
@@ -74,9 +76,14 @@ def update_user(
     if not expressions:
         return
 
-    table.update_item(
-        Key={"PK": f"USER#{user_id}"},
-        UpdateExpression="SET " + ", ".join(expressions),
-        ExpressionAttributeNames=attr_names,
-        ExpressionAttributeValues=attr_values,
-    )
+    update_kwargs: dict = {
+        "Key":                     {"PK": f"USER#{user_id}"},
+        "UpdateExpression":        "SET " + ", ".join(expressions),
+        "ExpressionAttributeValues": attr_values,
+    }
+    # 未使用の ExpressionAttributeNames を渡すと DynamoDB が ValidationException を返すため
+    # name を更新するときのみ追加する
+    if attr_names:
+        update_kwargs["ExpressionAttributeNames"] = attr_names
+
+    table.update_item(**update_kwargs)
