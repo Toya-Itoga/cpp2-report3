@@ -1,45 +1,30 @@
 """ダッシュボードルーター"""
 
+import os
 import calendar
+from decimal import Decimal
 from datetime import date, datetime
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
+from src.repositories import work_repository
 from src.routers.auth import get_current_user
-from src.utils.salary import calc_estimated_salary, format_currency
+from src.services import work_service
+from src.utils.salary import format_currency
 
 router = APIRouter(tags=["dashboard"])
 templates = Jinja2Templates(directory="src/templates")
 templates.env.filters["format_currency"] = format_currency
 
+WORK_TABLE_NAME = os.getenv("WORK_TABLE_NAME")
 
-def _make_dummy_monthly(yen_per_hour: int) -> dict:
-    """ダッシュボード用のダミー月次データを返す"""
-    total_minutes = 142 * 60 + 30
-    return {
-        "total_hours":       "142h 30m",
-        "work_days":         17,
-        "total_work_days":   20,
-        "overtime_hours":    "12h 15m",
-        "estimated_salary":  calc_estimated_salary(total_minutes, yen_per_hour),
-        "total_minutes":     total_minutes,
-    }
+# 曜日ラベル（月=0 … 日=6）
+WEEKDAY_JA = ["月", "火", "水", "木", "金", "土", "日"]
 
 
-def _make_daily_bars(work_data: list[float], max_h: int = 10, bar_max_px: int = 140) -> list[dict]:
-    """日別棒グラフ用データを生成する"""
-    bars = []
-    for i, v in enumerate(work_data):
-        pct = min(1.0, v / max_h)
-        bars.append({
-            "label":     str(i + 1),
-            "height_px": max(4, int(pct * bar_max_px)),
-            "accent":    v > 8.5,
-        })
-    return bars
-
+# ─── ヘルパー ─────────────────────────────────────────────────────────
 
 def _elapsed_label(clock_in_str: str | None) -> str | None:
     """出勤時刻（HH:MM）から現在までの経過時間ラベルを返す"""
@@ -53,7 +38,88 @@ def _elapsed_label(clock_in_str: str | None) -> str | None:
     return f"{dh}h {dm:02d}m"
 
 
+def _count_weekdays(year: int, month: int) -> int:
+    """指定月の平日数（月-金）を返す"""
+    _, days = calendar.monthrange(year, month)
+    return sum(
+        1 for d in range(1, days + 1)
+        if date(year, month, d).weekday() < 5
+    )
+
+
+def _build_daily_bars(
+    records: list[dict],
+    year: int,
+    month: int,
+    max_h: int = 10,
+    bar_max_px: int = 140,
+) -> list[dict]:
+    """月次レコードから日別棒グラフデータを生成する。
+    SK が WORK#YYYYMMDD 形式なので末尾2桁を日付として使用する。
+    """
+    _, total_days = calendar.monthrange(year, month)
+
+    # 日付 → 勤務時間（h）のマップを作成する
+    day_hours: dict[int, float] = {}
+    for r in records:
+        sk = r.get("SK", "")
+        if not sk.startswith("WORK#"):
+            continue
+        day = int(sk[-2:])
+        wm = int(Decimal(str(r.get("work_minutes") or 0)))
+        day_hours[day] = wm / 60
+
+    bars = []
+    for d in range(1, total_days + 1):
+        v = day_hours.get(d, 0.0)
+        pct = min(1.0, v / max_h) if v > 0 else 0
+        bars.append({
+            "label":     str(d),
+            "height_px": max(4, int(pct * bar_max_px)) if v > 0 else 4,
+            "accent":    v > 8.5,
+        })
+    return bars
+
+
+def _build_recent_records(records: list[dict]) -> list[dict]:
+    """月次レコードから直近5件を整形して返す（新しい順）。
+    SK 昇順で返ってくるため逆順にして先頭5件を取得する。
+    """
+    sorted_records = sorted(records, key=lambda r: r.get("SK", ""), reverse=True)[:5]
+
+    result = []
+    for r in sorted_records:
+        sk = r.get("SK", "")
+        if not sk.startswith("WORK#"):
+            continue
+        date_str = sk[5:]  # YYYYMMDD
+        d = date(int(date_str[:4]), int(date_str[4:6]), int(date_str[6:8]))
+        ci     = r.get("clock_in")
+        co     = r.get("clock_out")
+        status = r.get("status", "")
+
+        if status == "休日":
+            duration_label = "休"
+        elif ci and co:
+            wm = int(Decimal(str(r.get("work_minutes") or 0)))
+            h, m = divmod(wm, 60)
+            duration_label = f"{h}h {m:02d}m"
+        elif ci and not co:
+            duration_label = "出勤中"
+        else:
+            duration_label = "休"
+
+        result.append({
+            "date_label":     f"{d.month}/{d.day} ({WEEKDAY_JA[d.weekday()]})",
+            "clock_in":       ci,
+            "clock_out":      co,
+            "duration_label": duration_label,
+        })
+    return result
+
+
 # ─── ルート ───────────────────────────────────────────────────────────
+
 @router.get("/", response_class=HTMLResponse)
 async def root():
     return RedirectResponse(url="/dashboard")
@@ -62,26 +128,37 @@ async def root():
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, user: dict = Depends(get_current_user)):
     today = date.today()
-    weekday_ja = ["月", "火", "水", "木", "金", "土", "日"]
-    today_label = f"{today.year}年{today.month}月{today.day}日（{weekday_ja[today.weekday()]}）"
+    today_label = f"{today.year}年{today.month}月{today.day}日（{WEEKDAY_JA[today.weekday()]}）"
 
-    # TODO: DynamoDBから当日の勤務レコードを取得する
-    clock_in     = "09:02"   # ダミー
-    clock_out    = None       # ダミー（出勤中）
-    today_status = "出勤中"
-    elapsed      = _elapsed_label(clock_in)
+    # ─── DynamoDB からデータを取得する ────────────────────────────────
+    today_record    = {}
+    monthly_records = []
+    if WORK_TABLE_NAME:
+        today_record    = work_repository.get_record(user["user_id"], today) or {}
+        monthly_records = work_repository.get_monthly_records(
+            user["user_id"], today.year, today.month
+        )
 
-    monthly  = _make_dummy_monthly(user["yen_per_hour"])
-    raw_data = [8, 7.5, 8, 9, 6, 0, 0, 8, 8.5, 9, 7, 8, 0, 0, 8, 9, 10, 8, 7, 8.5, 5.5, 0, 0]
-    bars     = _make_daily_bars(raw_data)
+    # ─── 当日のステータスを決定する ────────────────────────────────────
+    clock_in  = today_record.get("clock_in")
+    clock_out = today_record.get("clock_out")
+    today_status = today_record.get("status") or (
+        "出勤中" if clock_in and not clock_out else
+        "退勤済" if clock_out else
+        "未出勤"
+    )
+    elapsed = _elapsed_label(clock_in) if clock_in and not clock_out else None
 
-    recent_records = [
-        {"date_label": "5/19 (火)", "clock_in": "09:00", "clock_out": "18:30", "duration_label": "8h 30m"},
-        {"date_label": "5/18 (月)", "clock_in": "09:05", "clock_out": "18:15", "duration_label": "8h 10m"},
-        {"date_label": "5/17 (日)", "clock_in": None,    "clock_out": None,    "duration_label": "休"},
-        {"date_label": "5/16 (土)", "clock_in": None,    "clock_out": None,    "duration_label": "休"},
-        {"date_label": "5/15 (金)", "clock_in": "08:55", "clock_out": "19:00", "duration_label": "9h 05m"},
-    ]
+    # ─── 月次集計する ─────────────────────────────────────────────────
+    agg = work_service.aggregate_monthly(monthly_records, user["yen_per_hour"])
+    monthly = {
+        "total_hours":      agg["total_hours_str"],
+        "work_days":        agg["work_days"],
+        "total_work_days":  _count_weekdays(today.year, today.month),
+        "overtime_hours":   agg["overtime_str"],
+        "estimated_salary": agg["estimated_salary"],
+        "total_minutes":    agg["total_minutes"],
+    }
 
     return templates.TemplateResponse(request, "dashboard.html", {
         "user":           user,
@@ -92,6 +169,6 @@ async def dashboard(request: Request, user: dict = Depends(get_current_user)):
         "clock_out":      clock_out,
         "elapsed":        elapsed,
         "monthly":        monthly,
-        "daily_bars":     bars,
-        "recent_records": recent_records,
+        "daily_bars":     _build_daily_bars(monthly_records, today.year, today.month),
+        "recent_records": _build_recent_records(monthly_records),
     })
