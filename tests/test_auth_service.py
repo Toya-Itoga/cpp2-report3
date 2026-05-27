@@ -76,8 +76,9 @@ class TestJWT:
 
 
 class TestAuthenticate:
-    def test_development_returns_dummy_user(self):
-        """ENV=development ではダミーユーザーを返すこと"""
+    def test_development_falls_back_to_dummy_when_dynamodb_unavailable(self):
+        """ENV=development で DynamoDB に接続できない場合はダミーユーザーを返すこと
+        （USER_TABLE_NAME 未設定 → RuntimeError → DUMMY_USER フォールバック）"""
         user = authenticate("any@example.com", "any")
         assert user == DUMMY_USER
 

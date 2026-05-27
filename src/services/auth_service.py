@@ -91,13 +91,20 @@ def authenticate(email: str, password: str) -> Optional[dict]:
     """
     メールアドレスとパスワードでユーザーを認証する。
     認証成功時はユーザー dict を返し、失敗時は None を返す。
-    ENV=development ではダミーユーザーを返す。
+    ENV=development では DynamoDB 接続を試み、接続できない場合はダミーユーザーを返す。
     """
-    if ENV == "development":
-        return DUMMY_USER
+    try:
+        user = user_repository.get_user_by_email(email)
+    except Exception:
+        # DynamoDB に接続できない場合は開発環境のみダミーユーザーを返す
+        if ENV == "development":
+            return DUMMY_USER
+        return None
 
-    user = user_repository.get_user_by_email(email)
     if not user:
+        # DynamoDB にユーザーが存在しない場合も開発環境はダミーユーザーを返す
+        if ENV == "development":
+            return DUMMY_USER
         return None
 
     stored_hash = user.get("password_hash", "")
