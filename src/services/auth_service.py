@@ -52,16 +52,16 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 # ─── JWT トークン ──────────────────────────────────────────────────────────
 
-def create_token(user_id: str) -> str:
-    """JWT アクセストークンを生成して返す"""
+def create_token(user_name: str) -> str:
+    """JWT アクセストークンを生成して返す（sub に user_name を格納する）"""
     expire  = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRE_H)
-    payload = {"sub": user_id, "exp": expire}
+    payload = {"sub": user_name, "exp": expire}
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
 def verify_token(token: str) -> str:
     """
-    JWT トークンを検証して user_id を返す。
+    JWT トークンを検証して user_name を返す。
     有効期限切れ・不正トークンの場合は HTTPException(401) を送出する。
     """
     try:
@@ -100,17 +100,17 @@ def authenticate(user_name: str, password: str) -> Optional[dict]:
     return user
 
 
-def get_user_from_token(user_id: str) -> dict:
+def get_user_from_token(user_name: str) -> dict:
     """
-    user_id から DynamoDB のユーザー情報を取得して返す。
+    JWT の sub（user_name）から DynamoDB のユーザー情報を取得して返す。
     ユーザーが存在しない場合は HTTPException(401) を送出する。
     """
-    user = user_repository.get_user(user_id)
+    user = user_repository.get_user(user_name)
     if not user:
         raise HTTPException(status_code=401, detail="ユーザーが見つかりません")
 
     return {
-        "user_id":      user.get("user_id", user_id),
+        "user_id":      user.get("user_id", user_name),
         "name":         user.get("name", ""),
         "email":        user.get("email", ""),
         "yen_per_hour": int(user.get("yen_per_hour", 0)),
@@ -129,5 +129,5 @@ async def get_current_user(request: Request) -> dict:
     if not token:
         raise HTTPException(status_code=401, detail="認証が必要です")
 
-    user_id = verify_token(token)
-    return get_user_from_token(user_id)
+    user_name = verify_token(token)
+    return get_user_from_token(user_name)

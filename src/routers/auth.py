@@ -46,7 +46,7 @@ async def login(
             status_code=401,
         )
 
-    token = auth_service.create_token(user["user_id"])
+    token = auth_service.create_token(user_name)
     resp  = RedirectResponse(url="/dashboard", status_code=303)
     resp.set_cookie(
         COOKIE_NAME,

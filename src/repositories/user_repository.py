@@ -29,15 +29,14 @@ _FALLBACK_USER_FIELDS: dict = {
 }
 
 
-def get_user(user_id: str) -> dict:
-    """user_id でユーザーを取得する。存在しない場合はフォールバックを返す"""
-    table = _get_table()
-    response = table.get_item(Key={"PK": f"USER#{user_id}"})
-    item = response.get("Item")
+def get_user(user_name: str) -> dict:
+    """user_name でユーザーを取得する。存在しない場合はフォールバックを返す"""
+    # PK(USER#user_name) + SK(user_id) で検索するため get_user_by_name に委譲する
+    item = get_user_by_name(user_name)
     if item:
         return item
     # DynamoDB にレコードが存在しない場合はフォールバックを返す
-    return {"user_id": user_id, **_FALLBACK_USER_FIELDS}
+    return {"user_id": user_name, **_FALLBACK_USER_FIELDS}
 
 
 def get_user_by_name(user_name: str) -> Optional[dict]:
