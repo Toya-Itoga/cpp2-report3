@@ -16,16 +16,17 @@ def _make_mock_table():
 
 class TestGetUser:
     def test_returns_item_when_found(self, monkeypatch):
-        """DynamoDB にユーザーが存在する場合はそのアイテムを返すこと"""
+        """DynamoDB に user_name のユーザーが存在する場合はそのアイテムを返すこと"""
         monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
 
         mock_table, mock_dynamodb = _make_mock_table()
-        mock_table.get_item.return_value = {
-            "Item": {"PK": "USER#u1", "user_id": "u1", "name": "Alice", "yen_per_hour": 2000}
+        # get_user は get_user_by_name (query) に委譲する
+        mock_table.query.return_value = {
+            "Items": [{"PK": "USER#alice", "user_id": "u1", "name": "Alice", "yen_per_hour": 2000}]
         }
 
         with patch("boto3.resource", return_value=mock_dynamodb):
-            result = user_repository.get_user("u1")
+            result = user_repository.get_user("alice")
 
         assert result["name"] == "Alice"
         assert result["yen_per_hour"] == 2000
@@ -35,7 +36,7 @@ class TestGetUser:
         monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
 
         mock_table, mock_dynamodb = _make_mock_table()
-        mock_table.get_item.return_value = {}  # Item キーなし
+        mock_table.query.return_value = {"Items": []}
 
         with patch("boto3.resource", return_value=mock_dynamodb):
             result = user_repository.get_user("unknown_user")
@@ -50,7 +51,7 @@ class TestGetUser:
         monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
 
         mock_table, mock_dynamodb = _make_mock_table()
-        mock_table.get_item.return_value = {}
+        mock_table.query.return_value = {"Items": []}
 
         with patch("boto3.resource", return_value=mock_dynamodb):
             result = user_repository.get_user("no_such_user")
