@@ -8,12 +8,11 @@ CLAUDE.md の認証ポリシー:
 - 認証処理は src/services/auth_service.py に定義すること
 """
 
-import hashlib
-import hmac
 import os
 from datetime import datetime, timedelta, timezone
 from typing import Optional
 
+import bcrypt
 import jwt
 from fastapi import HTTPException, Request
 
@@ -39,26 +38,15 @@ DUMMY_USER: dict = {
 # ─── パスワードハッシュ ────────────────────────────────────────────────────
 
 def hash_password(password: str) -> str:
-    """
-    PBKDF2-SHA256 でパスワードをハッシュ化する。
-    返り値フォーマット: "<salt_hex>:<key_hex>"
-    """
-    salt = os.urandom(32)
-    key  = hashlib.pbkdf2_hmac("sha256", password.encode(), salt, 100_000)
-    return f"{salt.hex()}:{key.hex()}"
+    """bcrypt でパスワードをハッシュ化して文字列で返す"""
+    return bcrypt.hashpw(password.encode(), bcrypt.gensalt()).decode()
 
 
 def verify_password(plain: str, hashed: str) -> bool:
-    """
-    平文パスワードとハッシュを比較する。
-    タイミング攻撃を防ぐため hmac.compare_digest を使用する。
-    """
+    """bcrypt でパスワードを検証する。不正なハッシュの場合は False を返す"""
     try:
-        salt_hex, key_hex = hashed.split(":", 1)
-        salt = bytes.fromhex(salt_hex)
-        key  = hashlib.pbkdf2_hmac("sha256", plain.encode(), salt, 100_000)
-        return hmac.compare_digest(key.hex(), key_hex)
-    except (ValueError, AttributeError):
+        return bcrypt.checkpw(plain.encode(), hashed.encode())
+    except Exception:
         return False
 
 
@@ -87,28 +75,26 @@ def verify_token(token: str) -> str:
 
 # ─── ユーザー認証 ──────────────────────────────────────────────────────────
 
-def authenticate(email: str, password: str) -> Optional[dict]:
+def authenticate(user_name: str, password: str) -> Optional[dict]:
     """
-    メールアドレスとパスワードでユーザーを認証する。
+    ユーザー名とパスワードでユーザーを認証する。
     認証成功時はユーザー dict を返し、失敗時は None を返す。
-    ENV=development では DynamoDB 接続を試み、接続できない場合はダミーユーザーを返す。
     """
     try:
-        user = user_repository.get_user_by_email(email)
+        user = user_repository.get_user_by_name(user_name)
     except Exception:
-        # DynamoDB に接続できない場合は開発環境のみダミーユーザーを返す
-        if ENV == "development":
-            return DUMMY_USER
         return None
 
     if not user:
-        # DynamoDB にユーザーが存在しない場合も開発環境はダミーユーザーを返す
-        if ENV == "development":
-            return DUMMY_USER
         return None
 
-    stored_hash = user.get("password_hash", "")
-    if not verify_password(password, stored_hash):
+    stored_hash = user.get("password", "")
+    if not stored_hash:
+        return None
+    try:
+        if not bcrypt.checkpw(password.encode(), stored_hash.encode()):
+            return None
+    except Exception:
         return None
 
     return user
@@ -118,11 +104,7 @@ def get_user_from_token(user_id: str) -> dict:
     """
     user_id から DynamoDB のユーザー情報を取得して返す。
     ユーザーが存在しない場合は HTTPException(401) を送出する。
-    ENV=development ではダミーユーザーを返す。
     """
-    if ENV == "development":
-        return DUMMY_USER
-
     user = user_repository.get_user(user_id)
     if not user:
         raise HTTPException(status_code=401, detail="ユーザーが見つかりません")
@@ -141,11 +123,8 @@ async def get_current_user(request: Request) -> dict:
     """
     Cookie からトークンを取得・検証し、ユーザー情報を返す。
     FastAPI の Depends で全エンドポイントに適用する。
-    ENV=development の場合は DynamoDB 認証をスキップしてダミーユーザーを返す。
+    トークンがない場合は 401 を送出し、main.py のハンドラーが /auth/login へリダイレクトする。
     """
-    if ENV == "development":
-        return DUMMY_USER
-
     token = request.cookies.get(COOKIE_NAME)
     if not token:
         raise HTTPException(status_code=401, detail="認証が必要です")

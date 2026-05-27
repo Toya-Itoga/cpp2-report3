@@ -87,14 +87,14 @@
 
       <form method="post" action="/auth/login" class="flex flex-col gap-24" style="gap: 22px;">
         <div class="field">
-          <label class="field__label" for="email">メールアドレス</label>
+          <label class="field__label" for="user_name">ユーザー名</label>
           <input
             class="field__input"
-            id="email"
-            name="email"
-            type="email"
-            placeholder="you@kintai.app"
-            autocomplete="email"
+            id="user_name"
+            name="user_name"
+            type="text"
+            placeholder="例: admin"
+            autocomplete="username"
             required
           />
         </div>

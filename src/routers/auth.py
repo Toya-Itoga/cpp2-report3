@@ -31,18 +31,18 @@ async def login_page(request: Request):
 
 @router.post("/login")
 async def login(
-    request: Request,
-    response: Response,
-    email:    Annotated[str, Form()],
-    password: Annotated[str, Form()],
+    request:   Request,
+    response:  Response,
+    user_name: Annotated[str, Form()],
+    password:  Annotated[str, Form()],
 ):
-    """メールアドレス + パスワードで認証し、成功時は JWT Cookie を発行する"""
-    user = auth_service.authenticate(email, password)
+    """ユーザー名 + パスワードで認証し、成功時は JWT Cookie を発行する"""
+    user = auth_service.authenticate(user_name, password)
 
     if user is None:
         return templates.TemplateResponse(
             request, "login.html",
-            {"error": "メールアドレスまたはパスワードが正しくありません"},
+            {"error": "ユーザー名またはパスワードが正しくありません"},
             status_code=401,
         )
 
