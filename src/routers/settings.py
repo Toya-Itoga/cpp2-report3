@@ -44,7 +44,7 @@ async def settings_page(
     # DynamoDB に保存された最新の時給で user を上書きする（DB 接続失敗時はそのまま使用）
     if USER_TABLE_NAME:
         try:
-            db_user = user_repository.get_user(user["user_id"])
+            db_user = user_repository.get_user(user["user_name"], user["user_id"])
             if db_user and "yen_per_hour" in db_user:
                 user = {**user, "yen_per_hour": int(db_user["yen_per_hour"])}
         except Exception:
@@ -67,7 +67,7 @@ async def update_profile(
 ):
     """プロフィール（氏名・メール）を更新する"""
     if USER_TABLE_NAME:
-        user_repository.update_user(user["user_id"], name=name, email=email)
+        user_repository.update_user(user["user_id"], user["user_name"], name=name, email=email)
     return RedirectResponse(url="/settings", status_code=303)
 
 
@@ -95,12 +95,12 @@ async def update_password(
 
     if USER_TABLE_NAME:
         # DynamoDB からユーザーを取得して現在のパスワードを検証する
-        db_user = user_repository.get_user(user["user_id"])
+        db_user = user_repository.get_user(user["user_name"], user["user_id"])
         if db_user and db_user.get("password_hash"):
             if not auth_service.verify_password(current_password, db_user["password_hash"]):
                 return _error_response("現在のパスワードが正しくありません")
         new_hash = auth_service.hash_password(new_password)
-        user_repository.update_user(user["user_id"], password_hash=new_hash)
+        user_repository.update_user(user["user_id"], user["user_name"], password_hash=new_hash)
 
     return RedirectResponse(url="/settings", status_code=303)
 
@@ -114,5 +114,5 @@ async def update_salary(
 ):
     """時給を更新する"""
     if USER_TABLE_NAME:
-        user_repository.update_user(user["user_id"], yen_per_hour=yen_per_hour)
+        user_repository.update_user(user["user_id"], user["user_name"], yen_per_hour=yen_per_hour)
     return RedirectResponse(url="/settings", status_code=303)

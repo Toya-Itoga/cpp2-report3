@@ -26,7 +26,7 @@ JWT_EXPIRE_H   = int(os.getenv("JWT_EXPIRE_HOURS", "6"))
 
 COOKIE_NAME = "access_token"
 
-# ─── ダミーユーザー（ENV=development 時） ─────────────────────────────────
+# ─── ダミーユーザー（定義のみ・使用しない） ───────────────────────────────
 DUMMY_USER: dict = {
     "user_id":      "dummy_user",
     "name":         "testuser",
@@ -52,21 +52,24 @@ def verify_password(plain: str, hashed: str) -> bool:
 
 # ─── JWT トークン ──────────────────────────────────────────────────────────
 
-def create_token(user_name: str) -> str:
-    """JWT アクセストークンを生成して返す（sub に user_name を格納する）"""
+def create_token(user_id: str, user_name: str) -> str:
+    """JWT アクセストークンを生成して返す（sub に user_id、user_name も格納する）"""
     expire  = datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRE_H)
-    payload = {"sub": user_name, "exp": expire}
+    payload = {"sub": user_id, "user_name": user_name, "exp": expire}
     return jwt.encode(payload, JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)
 
 
-def verify_token(token: str) -> str:
+def verify_token(token: str) -> dict:
     """
-    JWT トークンを検証して user_name を返す。
+    JWT トークンを検証して {"user_id": ..., "user_name": ...} を返す。
     有効期限切れ・不正トークンの場合は HTTPException(401) を送出する。
     """
     try:
         payload = jwt.decode(token, JWT_SECRET_KEY, algorithms=[JWT_ALGORITHM])
-        return str(payload["sub"])
+        return {
+            "user_id":   str(payload["sub"]),
+            "user_name": str(payload.get("user_name", payload["sub"])),
+        }
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="トークンの有効期限が切れています")
     except jwt.PyJWTError:
@@ -100,17 +103,18 @@ def authenticate(user_name: str, password: str) -> Optional[dict]:
     return user
 
 
-def get_user_from_token(user_name: str) -> dict:
+def get_user_from_token(user_id: str, user_name: str) -> dict:
     """
-    JWT の sub（user_name）から DynamoDB のユーザー情報を取得して返す。
+    JWT の sub（user_id）と user_name から DynamoDB のユーザー情報を取得して返す。
     ユーザーが存在しない場合は HTTPException(401) を送出する。
     """
-    user = user_repository.get_user(user_name)
+    user = user_repository.get_user(user_name, user_id)
     if not user:
         raise HTTPException(status_code=401, detail="ユーザーが見つかりません")
 
     return {
-        "user_id":      user.get("user_id", user_name),
+        "user_id":      user.get("user_id", user_id),
+        "user_name":    user_name,
         "name":         user.get("name", ""),
         "email":        user.get("email", ""),
         "yen_per_hour": int(user.get("yen_per_hour", 0)),
@@ -129,5 +133,5 @@ async def get_current_user(request: Request) -> dict:
     if not token:
         raise HTTPException(status_code=401, detail="認証が必要です")
 
-    user_name = verify_token(token)
-    return get_user_from_token(user_name)
+    claims = verify_token(token)
+    return get_user_from_token(claims["user_id"], claims["user_name"])
