@@ -6,7 +6,7 @@
 |---|---|
 | アプリ名 | 勤怠管理アプリ |
 | 概要 | 勤務時間の記録・想定月給与の確認が可能なWEBアプリ |
-| 動作環境 | AWS Lambda（本番）/ ローカルDocker（開発） |
+| 動作環境 | AWS Lambda（本番） |
 
 ### 技術スタック
 
@@ -87,38 +87,3 @@
 ```
 
 ---
-
-## 環境変数
-
-| 変数名 | 説明 | 例 |
-|---|---|---|
-| `ENV` | 実行環境 | `development` / `production` |
-| `DYNAMODB_ENDPOINT` | DynamoDB エンドポイント | `http://localhost:5434`（ローカル） |
-| `DYNAMODB_REGION` | AWSリージョン | `ap-northeast-1` |
-| `AWS_ACCESS_KEY_ID` | AWSアクセスキー | - |
-| `AWS_SECRET_ACCESS_KEY` | AWSシークレットキー | - |
-| `USER_TABLE_NAME` | Userテーブル名 | `kintai-users` |
-| `WORK_TABLE_NAME` | Workテーブル名 | `kintai-works` |
-| `JWT_SECRET_KEY` | JWT署名キー | - |
-| `JWT_ALGORITHM` | JWTアルゴリズム | `HS256` |
-| `JWT_EXPIRE_HOURS` | トークン有効期間 | `6` |
-| `PORT` | サーバーポート番号 | `8002` |
-
----
-
-## ローカル開発
-
-```bash
-# 仮想環境を有効化
-source .venv/bin/activate
-
-# 開発サーバーを起動（ポート8002）
-python -m uvicorn src.main:app --reload --port 8002
-```
-
-## テスト実行
-
-```bash
-source .venv/bin/activate
-python -m pytest tests/
-```
