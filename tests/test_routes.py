@@ -79,3 +79,18 @@ def test_clock_out_redirects():
     r = client.post("/punch/clock-out")
     assert r.status_code == 200
     assert "こんにちは" in r.text or "Kintai" in r.text
+
+
+def test_unauthenticated_redirects_to_login():
+    """Cookie なし（本番モード）のリクエストは /auth/login にリダイレクトされること"""
+    import src.services.auth_service as auth_svc
+
+    original_env = auth_svc.ENV
+    auth_svc.ENV = "production"
+    try:
+        prod_client = TestClient(app, follow_redirects=False)
+        r = prod_client.get("/dashboard")
+        assert r.status_code == 303
+        assert "/auth/login" in r.headers["location"]
+    finally:
+        auth_svc.ENV = original_env
