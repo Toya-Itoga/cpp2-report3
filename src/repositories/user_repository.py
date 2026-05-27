@@ -40,12 +40,11 @@ def get_user(user_id: str) -> dict:
     return {"user_id": user_id, **_FALLBACK_USER_FIELDS}
 
 
-def get_user_by_email(email: str) -> Optional[dict]:
-    """メールアドレスでユーザーを検索する（GSI: email-index が必要）"""
+def get_user_by_name(user_name: str) -> Optional[dict]:
+    """user_name でユーザーを検索する。存在しない場合は None を返す"""
     table = _get_table()
     response = table.query(
-        IndexName="email-index",
-        KeyConditionExpression=Key("email").eq(email),
+        KeyConditionExpression=Key("PK").eq(f"USER#{user_name}"),
         Limit=1,
     )
     items = response.get("Items", [])

@@ -46,26 +46,19 @@ def _user_table_definition(table_name: str) -> dict:
     """
     Userテーブルの定義を返す。
 
-    キー設計（requirements.md より）:
-        PK: USER#user_id (HASH)
-    GSI:
-        email-index: email (HASH) ← メールアドレスでのユーザー検索に使用
+    キー設計（implement.md より）:
+        PK: USER#user_name (HASH)  ← ユーザー名でのログインに使用
+        SK: user_id        (RANGE)
     """
     return {
         "TableName": table_name,
         "AttributeDefinitions": [
-            {"AttributeName": "PK",    "AttributeType": "S"},
-            {"AttributeName": "email", "AttributeType": "S"},
+            {"AttributeName": "PK",      "AttributeType": "S"},
+            {"AttributeName": "user_id", "AttributeType": "S"},
         ],
         "KeySchema": [
-            {"AttributeName": "PK", "KeyType": "HASH"},
-        ],
-        "GlobalSecondaryIndexes": [
-            {
-                "IndexName":  "email-index",
-                "KeySchema":  [{"AttributeName": "email", "KeyType": "HASH"}],
-                "Projection": {"ProjectionType": "ALL"},
-            }
+            {"AttributeName": "PK",      "KeyType": "HASH"},
+            {"AttributeName": "user_id", "KeyType": "RANGE"},
         ],
         "BillingMode": "PAY_PER_REQUEST",
     }
