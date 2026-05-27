@@ -12,6 +12,52 @@ def _make_mock_table():
     return mock_table, mock_dynamodb
 
 
+# ─── get_user のテスト ────────────────────────────────────────────────
+
+class TestGetUser:
+    def test_returns_item_when_found(self, monkeypatch):
+        """DynamoDB にユーザーが存在する場合はそのアイテムを返すこと"""
+        monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
+
+        mock_table, mock_dynamodb = _make_mock_table()
+        mock_table.get_item.return_value = {
+            "Item": {"PK": "USER#u1", "user_id": "u1", "name": "Alice", "yen_per_hour": 2000}
+        }
+
+        with patch("boto3.resource", return_value=mock_dynamodb):
+            result = user_repository.get_user("u1")
+
+        assert result["name"] == "Alice"
+        assert result["yen_per_hour"] == 2000
+
+    def test_returns_fallback_when_not_found(self, monkeypatch):
+        """DynamoDB にユーザーが存在しない場合はフォールバックを返すこと"""
+        monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
+
+        mock_table, mock_dynamodb = _make_mock_table()
+        mock_table.get_item.return_value = {}  # Item キーなし
+
+        with patch("boto3.resource", return_value=mock_dynamodb):
+            result = user_repository.get_user("unknown_user")
+
+        assert result["user_id"]      == "unknown_user"
+        assert result["name"]         == "sampleuser"
+        assert result["email"]        == "sample@kintai.app"
+        assert result["yen_per_hour"] == 1500
+
+    def test_fallback_does_not_contain_password_hash(self, monkeypatch):
+        """フォールバックユーザーには password_hash が含まれないこと"""
+        monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
+
+        mock_table, mock_dynamodb = _make_mock_table()
+        mock_table.get_item.return_value = {}
+
+        with patch("boto3.resource", return_value=mock_dynamodb):
+            result = user_repository.get_user("no_such_user")
+
+        assert "password_hash" not in result
+
+
 # ─── update_user のテスト ─────────────────────────────────────────────
 
 class TestUpdateUser:

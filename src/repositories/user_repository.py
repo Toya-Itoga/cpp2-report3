@@ -1,7 +1,7 @@
 """Userテーブルの DynamoDB 操作を定義するリポジトリ"""
 
 import os
-from typing import Optional
+from typing import Optional  # get_user_by_email・update_user の Optional[dict] / Optional[str] で使用
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -21,11 +21,23 @@ def _get_table():
     return dynamodb.Table(table_name)
 
 
-def get_user(user_id: str) -> Optional[dict]:
-    """user_id でユーザーを取得する。存在しない場合は None を返す"""
+# DynamoDB にレコードが存在しない場合のフォールバック値
+_FALLBACK_USER_FIELDS: dict = {
+    "name":         "sampleuser",
+    "email":        "sample@kintai.app",
+    "yen_per_hour": 1500,
+}
+
+
+def get_user(user_id: str) -> dict:
+    """user_id でユーザーを取得する。存在しない場合はフォールバックを返す"""
     table = _get_table()
     response = table.get_item(Key={"PK": f"USER#{user_id}"})
-    return response.get("Item")
+    item = response.get("Item")
+    if item:
+        return item
+    # DynamoDB にレコードが存在しない場合はフォールバックを返す
+    return {"user_id": user_id, **_FALLBACK_USER_FIELDS}
 
 
 def get_user_by_email(email: str) -> Optional[dict]:
