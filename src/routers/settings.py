@@ -41,11 +41,14 @@ async def settings_page(
     request: Request,
     user: dict = Depends(get_current_user),
 ):
-    # DynamoDB に保存された最新の時給で user を上書きする
+    # DynamoDB に保存された最新の時給で user を上書きする（DB 接続失敗時はそのまま使用）
     if USER_TABLE_NAME:
-        db_user = user_repository.get_user(user["user_id"])
-        if db_user and "yen_per_hour" in db_user:
-            user = {**user, "yen_per_hour": int(db_user["yen_per_hour"])}
+        try:
+            db_user = user_repository.get_user(user["user_id"])
+            if db_user and "yen_per_hour" in db_user:
+                user = {**user, "yen_per_hour": int(db_user["yen_per_hour"])}
+        except Exception:
+            pass
     return templates.TemplateResponse(request, "settings.html", {
         "user":     user,
         "active":   "settings",
