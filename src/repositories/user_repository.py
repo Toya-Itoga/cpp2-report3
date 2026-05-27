@@ -1,7 +1,7 @@
 """Userテーブルの DynamoDB 操作を定義するリポジトリ"""
 
 import os
-from typing import Optional  # get_user_by_email・update_user の Optional[dict] / Optional[str] で使用
+from typing import Optional
 
 import boto3
 from boto3.dynamodb.conditions import Key
@@ -21,22 +21,23 @@ def _get_table():
     return dynamodb.Table(table_name)
 
 
-# DynamoDB にレコードが存在しない場合のフォールバック値
+# DynamoDB にレコードが存在しない場合のフォールバック値（ダミーデータは含めない）
 _FALLBACK_USER_FIELDS: dict = {
-    "name":         "sampleuser",
-    "email":        "sample@kintai.app",
-    "yen_per_hour": 1500,
+    "name":         "",
+    "email":        "",
+    "yen_per_hour": 0,
 }
 
 
-def get_user(user_name: str) -> dict:
-    """user_name でユーザーを取得する。存在しない場合はフォールバックを返す"""
-    # PK(USER#user_name) + SK(user_id) で検索するため get_user_by_name に委譲する
-    item = get_user_by_name(user_name)
+def get_user(user_name: str, user_id: str) -> dict:
+    """PK(USER#user_name) + SK(user_id) で get_item してユーザーを取得する。存在しない場合はフォールバックを返す"""
+    table = _get_table()
+    response = table.get_item(Key={"PK": f"USER#{user_name}", "user_id": user_id})
+    item = response.get("Item")
     if item:
         return item
     # DynamoDB にレコードが存在しない場合はフォールバックを返す
-    return {"user_id": user_name, **_FALLBACK_USER_FIELDS}
+    return {"user_id": user_id, **_FALLBACK_USER_FIELDS}
 
 
 def get_user_by_name(user_name: str) -> Optional[dict]:
@@ -52,6 +53,7 @@ def get_user_by_name(user_name: str) -> Optional[dict]:
 
 def update_user(
     user_id: str,
+    user_name: str,
     name: Optional[str] = None,
     email: Optional[str] = None,
     yen_per_hour: Optional[int] = None,
@@ -87,8 +89,8 @@ def update_user(
         return
 
     update_kwargs: dict = {
-        "Key":                     {"PK": f"USER#{user_id}"},
-        "UpdateExpression":        "SET " + ", ".join(expressions),
+        "Key":                       {"PK": f"USER#{user_name}", "user_id": user_id},
+        "UpdateExpression":          "SET " + ", ".join(expressions),
         "ExpressionAttributeValues": attr_values,
     }
     # 未使用の ExpressionAttributeNames を渡すと DynamoDB が ValidationException を返すため
