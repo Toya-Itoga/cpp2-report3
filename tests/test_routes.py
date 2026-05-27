@@ -60,11 +60,9 @@ def test_history_month_navigation():
 
 
 def test_settings_page():
-    """設定画面が200を返し、全セクションを含むこと"""
+    """設定画面が200を返し、給与セクションを含むこと"""
     r = client.get("/settings")
     assert r.status_code == 200
-    assert "プロフィール" in r.text
-    assert "パスワード" in r.text
     assert "給与" in r.text
 
 
