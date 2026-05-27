@@ -57,54 +57,6 @@ async def settings_page(
     })
 
 
-# ─── プロフィール更新 ─────────────────────────────────────────────────
-
-@router.post("/profile")
-async def update_profile(
-    name:  Annotated[str, Form()],
-    email: Annotated[str, Form()],
-    user:  dict = Depends(get_current_user),
-):
-    """プロフィール（氏名・メール）を更新する"""
-    if USER_TABLE_NAME:
-        user_repository.update_user(user["user_id"], user["user_name"], name=name, email=email)
-    return RedirectResponse(url="/settings", status_code=303)
-
-
-# ─── パスワード変更 ───────────────────────────────────────────────────
-
-@router.post("/password")
-async def update_password(
-    request: Request,
-    current_password: Annotated[str, Form()],
-    new_password:     Annotated[str, Form()],
-    confirm_password: Annotated[str, Form()],
-    user: dict = Depends(get_current_user),
-):
-    """パスワードを変更する"""
-    def _error_response(msg: str):
-        return templates.TemplateResponse(request, "settings.html", {
-            "user":     user,
-            "active":   "settings",
-            "messages": {"password_error": msg},
-            **_monthly_context(user),
-        }, status_code=400)
-
-    if new_password != confirm_password:
-        return _error_response("新しいパスワードが一致しません")
-
-    if USER_TABLE_NAME:
-        # DynamoDB からユーザーを取得して現在のパスワードを検証する
-        db_user = user_repository.get_user(user["user_name"], user["user_id"])
-        if db_user and db_user.get("password_hash"):
-            if not auth_service.verify_password(current_password, db_user["password_hash"]):
-                return _error_response("現在のパスワードが正しくありません")
-        new_hash = auth_service.hash_password(new_password)
-        user_repository.update_user(user["user_id"], user["user_name"], password_hash=new_hash)
-
-    return RedirectResponse(url="/settings", status_code=303)
-
-
 # ─── 時給更新 ─────────────────────────────────────────────────────────
 
 @router.post("/salary")

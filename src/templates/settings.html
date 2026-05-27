@@ -9,84 +9,16 @@
     <!-- 左サイドバー（アンカーナビ） -->
     <div class="settings-sidebar">
       <span style="font-size: 12px; color: var(--ink3); font-style: italic;">セクション</span>
-      <a href="#profile"  class="settings-anchor" :class="{ 'settings-anchor--active': section === 'profile'  }" @click.prevent="scrollTo('profile')">プロフィール</a>
-      <a href="#password" class="settings-anchor" :class="{ 'settings-anchor--active': section === 'password' }" @click.prevent="scrollTo('password')">パスワード</a>
-      <a href="#salary"   class="settings-anchor" :class="{ 'settings-anchor--active': section === 'salary'   }" @click.prevent="scrollTo('salary')">給与</a>
+      <a href="#salary" class="settings-anchor settings-anchor--active">給与</a>
     </div>
 
     <!-- スクロールコンテンツ -->
-    <div class="settings-content" id="settings-scroll" @scroll="onScroll()" style="padding-bottom: 120px;">
+    <div class="settings-content" id="settings-scroll" style="padding-bottom: 120px;">
       <h1 style="font-size: 32px; font-weight: 700; margin-bottom: 4px;">設定</h1>
 
-      <!-- ① プロフィール -->
-      <section id="profile" style="margin-top: 22px;">
-        <h2 class="section-title">① プロフィール</h2>
-        <div class="divider"></div>
-
-        {% if messages.profile_success %}
-        <div style="background: #e8f5e9; border: 1.75px solid #4caf50; border-radius: 5px 7px 5px 6px/6px 5px 7px 5px; padding: 10px 14px; font-size: 14px; color: #2e7d32; margin-bottom: 16px;">
-          保存しました。
-        </div>
-        {% endif %}
-
-        <form method="post" action="/settings/profile" @change="dirty = true" style="display: flex; flex-direction: column; gap: 18px;">
-          <div class="grid-2">
-            <div class="field">
-              <label class="field__label" for="name">名前</label>
-              <input class="field__input" id="name" name="name" type="text" value="{{ user.name }}" required />
-            </div>
-            <div class="field">
-              <label class="field__label" for="email">メールアドレス</label>
-              <input class="field__input" id="email" name="email" type="email" value="{{ user.email }}" required />
-            </div>
-          </div>
-          <div>
-            <button type="submit" class="btn btn--accent" style="width: auto; padding: 10px 32px;">プロフィールを保存</button>
-          </div>
-        </form>
-      </section>
-
-      <!-- ② パスワード変更 -->
-      <section id="password" style="margin-top: 32px;">
-        <h2 class="section-title">② パスワード変更</h2>
-        <div class="divider"></div>
-
-        {% if messages.password_success %}
-        <div style="background: #e8f5e9; border: 1.75px solid #4caf50; border-radius: 5px 7px 5px 6px/6px 5px 7px 5px; padding: 10px 14px; font-size: 14px; color: #2e7d32; margin-bottom: 16px;">
-          パスワードを変更しました。
-        </div>
-        {% endif %}
-        {% if messages.password_error %}
-        <div style="background: #fde8e8; border: 1.75px solid #c04444; border-radius: 5px 7px 5px 6px/6px 5px 7px 5px; padding: 10px 14px; font-size: 14px; color: #c04444; margin-bottom: 16px;">
-          {{ messages.password_error }}
-        </div>
-        {% endif %}
-
-        <form method="post" action="/settings/password" @change="dirty = true" style="display: flex; flex-direction: column; gap: 18px;">
-          <div class="grid-3">
-            <div class="field">
-              <label class="field__label" for="current_pw">現在のパスワード</label>
-              <input class="field__input" id="current_pw" name="current_password" type="password" placeholder="••••••••" autocomplete="current-password" required />
-            </div>
-            <div class="field">
-              <label class="field__label" for="new_pw">新しいパスワード</label>
-              <input class="field__input" id="new_pw" name="new_password" type="password" placeholder="••••••••" autocomplete="new-password" required />
-              <span class="field__hint">8文字以上</span>
-            </div>
-            <div class="field">
-              <label class="field__label" for="confirm_pw">確認のためもう一度</label>
-              <input class="field__input" id="confirm_pw" name="confirm_password" type="password" placeholder="••••••••" autocomplete="new-password" required />
-            </div>
-          </div>
-          <div>
-            <button type="submit" class="btn btn--accent" style="width: auto; padding: 10px 32px;">パスワードを変更</button>
-          </div>
-        </form>
-      </section>
-
-      <!-- ③ 給与 -->
-      <section id="salary" style="margin-top: 32px;">
-        <h2 class="section-title">③ 給与</h2>
+      <!-- ① 給与 -->
+      <section id="salary" style="margin-top: 22px;">
+        <h2 class="section-title">① 給与</h2>
         <div class="divider"></div>
 
         {% if messages.salary_success %}
@@ -95,7 +27,7 @@
         </div>
         {% endif %}
 
-        <form method="post" action="/settings/salary" @change="dirty = true" style="display: flex; flex-direction: column; gap: 18px;">
+        <form method="post" action="/settings/salary" style="display: flex; flex-direction: column; gap: 18px;">
           <div style="max-width: 300px;">
             <div class="field">
               <label class="field__label" for="yen_per_hour">時給</label>
@@ -136,29 +68,7 @@
 {% block scripts %}
 <script>
   function settingsPage() {
-    return {
-      section: 'profile',
-      dirty: false,
-
-      scrollTo(id) {
-        document.getElementById(id).scrollIntoView({ behavior: 'smooth' });
-        this.section = id;
-      },
-
-      onScroll() {
-        /* スクロール位置に応じてサイドバーのアクティブセクションを更新 */
-        const sections = ['profile', 'password', 'salary'];
-        const container = document.getElementById('settings-scroll');
-        const offset = container.scrollTop + 80;
-        for (const id of [...sections].reverse()) {
-          const el = document.getElementById(id);
-          if (el && el.offsetTop <= offset) {
-            this.section = id;
-            break;
-          }
-        }
-      }
-    };
+    return {};
   }
 </script>
 {% endblock %}
