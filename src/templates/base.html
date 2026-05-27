@@ -25,7 +25,7 @@
     <a href="/punch"    class="nav__link {% if active == 'punch'     %}nav__link--active{% endif %}">打刻</a>
     <a href="/history"  class="nav__link {% if active == 'history'   %}nav__link--active{% endif %}">勤務履歴</a>
     <a href="/settings" class="nav__link {% if active == 'settings'  %}nav__link--active{% endif %}">設定</a>
-    <span class="nav__user">{{ user.name }} さん</span>
+    <span class="nav__user">{{ user.user_name }} さん</span>
   </nav>
   {% endif %}
 
