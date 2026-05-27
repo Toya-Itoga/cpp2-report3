@@ -7,6 +7,7 @@ from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
+from mangum import Mangum
 
 from src.routers import auth, dashboard, punch, history, settings
 from src.utils.salary import format_currency
@@ -38,3 +39,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     # その他の HTTP 例外はデフォルト処理に委譲する
     from fastapi.exception_handlers import http_exception_handler as _default
     return await _default(request, exc)
+
+
+# ─── AWS Lambda ハンドラー ───────────────────────────────────────────
+handler = Mangum(app)
