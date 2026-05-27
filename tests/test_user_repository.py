@@ -16,45 +16,46 @@ def _make_mock_table():
 
 class TestGetUser:
     def test_returns_item_when_found(self, monkeypatch):
-        """DynamoDB に user_name のユーザーが存在する場合はそのアイテムを返すこと"""
+        """PK+SK で get_item してユーザーが存在する場合はそのアイテムを返すこと"""
         monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
 
         mock_table, mock_dynamodb = _make_mock_table()
-        # get_user は get_user_by_name (query) に委譲する
-        mock_table.query.return_value = {
-            "Items": [{"PK": "USER#alice", "user_id": "u1", "name": "Alice", "yen_per_hour": 2000}]
+        mock_table.get_item.return_value = {
+            "Item": {"PK": "USER#alice", "user_id": "u1", "name": "Alice", "yen_per_hour": 2000}
         }
 
         with patch("boto3.resource", return_value=mock_dynamodb):
-            result = user_repository.get_user("alice")
+            result = user_repository.get_user("alice", "u1")
 
         assert result["name"] == "Alice"
         assert result["yen_per_hour"] == 2000
+        # PK と SK の両方がキーに含まれること
+        call_kwargs = mock_table.get_item.call_args.kwargs
+        assert call_kwargs["Key"] == {"PK": "USER#alice", "user_id": "u1"}
 
     def test_returns_fallback_when_not_found(self, monkeypatch):
         """DynamoDB にユーザーが存在しない場合はフォールバックを返すこと"""
         monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
 
         mock_table, mock_dynamodb = _make_mock_table()
-        mock_table.query.return_value = {"Items": []}
+        mock_table.get_item.return_value = {}  # Item キーなし
 
         with patch("boto3.resource", return_value=mock_dynamodb):
-            result = user_repository.get_user("unknown_user")
+            result = user_repository.get_user("unknown", "uid-x")
 
-        assert result["user_id"]      == "unknown_user"
-        assert result["name"]         == "sampleuser"
-        assert result["email"]        == "sample@kintai.app"
-        assert result["yen_per_hour"] == 1500
+        assert result["user_id"] == "uid-x"
+        assert result["name"]    == ""
+        assert result["email"]   == ""
 
     def test_fallback_does_not_contain_password_hash(self, monkeypatch):
         """フォールバックユーザーには password_hash が含まれないこと"""
         monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
 
         mock_table, mock_dynamodb = _make_mock_table()
-        mock_table.query.return_value = {"Items": []}
+        mock_table.get_item.return_value = {}
 
         with patch("boto3.resource", return_value=mock_dynamodb):
-            result = user_repository.get_user("no_such_user")
+            result = user_repository.get_user("no_such_user", "uid-y")
 
         assert "password_hash" not in result
 
@@ -98,7 +99,7 @@ class TestGetUserByName:
 class TestUpdateUser:
     def _call_update_user(self, mock_dynamodb, **kwargs):
         with patch("boto3.resource", return_value=mock_dynamodb):
-            user_repository.update_user("test_user", **kwargs)
+            user_repository.update_user("test_user", "testuser", **kwargs)
 
     def test_update_yen_per_hour_does_not_send_attr_names(self, monkeypatch):
         """yen_per_hour のみ更新するとき ExpressionAttributeNames を送らないこと

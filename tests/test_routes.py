@@ -10,6 +10,7 @@ from src.services import auth_service
 # テスト用ダミーユーザーで認証をバイパスする（全ルートテスト共通）
 _TEST_USER = {
     "user_id":      "test_user",
+    "user_name":    "test_user",
     "name":         "テストユーザー",
     "email":        "test@kintai.app",
     "yen_per_hour": 1500,

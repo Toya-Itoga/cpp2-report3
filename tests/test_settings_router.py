@@ -7,7 +7,7 @@ import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
 
-DUMMY_USER = {"user_id": "test_user", "name": "テストユーザー", "yen_per_hour": 1500}
+DUMMY_USER = {"user_id": "test_user", "user_name": "test_user", "name": "テストユーザー", "yen_per_hour": 1500}
 
 
 def _make_app(sett_module) -> TestClient:
@@ -70,7 +70,7 @@ class TestUpdateSalary:
             )
 
         assert resp.status_code == 303
-        mock_update.assert_called_once_with("test_user", yen_per_hour=2000)
+        mock_update.assert_called_once_with("test_user", "test_user", yen_per_hour=2000)
 
     def test_skips_dynamodb_when_no_table_name(self, monkeypatch):
         """USER_TABLE_NAME 未設定のとき update_user が呼ばれないこと"""
@@ -110,7 +110,7 @@ class TestUpdateProfile:
             )
 
         assert resp.status_code == 303
-        mock_update.assert_called_once_with("test_user", name="新しい名前", email="new@example.com")
+        mock_update.assert_called_once_with("test_user", "test_user", name="新しい名前", email="new@example.com")
 
 
 # ─── update_password のテスト ────────────────────────────────────────
@@ -186,4 +186,4 @@ class TestUpdatePassword:
             )
 
         assert resp.status_code == 303
-        mock_update.assert_called_once_with("test_user", password_hash="new_hash")
+        mock_update.assert_called_once_with("test_user", "test_user", password_hash="new_hash")

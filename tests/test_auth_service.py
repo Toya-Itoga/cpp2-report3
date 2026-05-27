@@ -53,9 +53,10 @@ class TestPasswordHash:
 class TestJWT:
     def test_create_and_verify_token(self):
         """トークン生成→検証ラウンドトリップが成功すること"""
-        token   = create_token("user123")
-        user_id = verify_token(token)
-        assert user_id == "user123"
+        token  = create_token("uid-001", "alice")
+        claims = verify_token(token)
+        assert claims["user_id"]   == "uid-001"
+        assert claims["user_name"] == "alice"
 
     def test_invalid_token_raises_401(self):
         """不正なトークンは 401 を送出すること"""
@@ -65,7 +66,7 @@ class TestJWT:
 
     def test_tampered_token_raises_401(self):
         """改ざんされたトークンは 401 を送出すること"""
-        token = create_token("user_a")
+        token = create_token("uid-002", "user_a")
         # payload部を書き換える
         parts    = token.split(".")
         tampered = parts[0] + ".dGFtcGVyZWQ." + parts[2]
