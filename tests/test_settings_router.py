@@ -23,6 +23,7 @@ class TestSettingsPage:
     def test_calls_get_monthly_records_when_table_set(self, monkeypatch):
         """WORK_TABLE_NAME が設定されているとき月次データ取得が呼ばれること"""
         monkeypatch.setenv("WORK_TABLE_NAME", "kintai-works")
+        monkeypatch.delenv("USER_TABLE_NAME", raising=False)
 
         import src.routers.settings as sett
         importlib.reload(sett)
@@ -37,6 +38,7 @@ class TestSettingsPage:
     def test_skips_dynamodb_when_no_table_name(self, monkeypatch):
         """WORK_TABLE_NAME 未設定のとき get_monthly_records が呼ばれないこと"""
         monkeypatch.delenv("WORK_TABLE_NAME", raising=False)
+        monkeypatch.delenv("USER_TABLE_NAME", raising=False)
 
         import src.routers.settings as sett
         importlib.reload(sett)

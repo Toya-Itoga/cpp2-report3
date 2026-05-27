@@ -143,8 +143,8 @@ class TestCreateTables:
             with pytest.raises(ClientError):
                 db_module.create_tables()
 
-    def test_user_table_has_pk_key_schema(self, monkeypatch):
-        """Userテーブルの KeySchema に PK(HASH) が含まれること"""
+    def test_user_table_has_pk_and_user_id_key_schema(self, monkeypatch):
+        """Userテーブルの KeySchema に PK(HASH) と user_id(RANGE) が含まれること"""
         monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
         monkeypatch.setenv("WORK_TABLE_NAME", "kintai-works")
         monkeypatch.setenv("ENV",             "development")
@@ -161,9 +161,31 @@ class TestCreateTables:
             db_module.create_tables()
 
         # 最初の呼び出しが User テーブル
-        user_call = mock_dynamodb.create_table.call_args_list[0]
+        user_call  = mock_dynamodb.create_table.call_args_list[0]
         key_schema = user_call.kwargs["KeySchema"]
-        assert {"AttributeName": "PK", "KeyType": "HASH"} in key_schema
+        assert {"AttributeName": "PK",      "KeyType": "HASH"}  in key_schema
+        assert {"AttributeName": "user_id", "KeyType": "RANGE"} in key_schema
+
+    def test_user_table_has_no_gsi(self, monkeypatch):
+        """Userテーブルに GSI が定義されていないこと（email-index 削除済み）"""
+        monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
+        monkeypatch.setenv("WORK_TABLE_NAME", "kintai-works")
+        monkeypatch.setenv("ENV",             "development")
+
+        mock_table    = MagicMock()
+        mock_dynamodb = MagicMock()
+        mock_dynamodb.create_table.return_value = mock_table
+        mock_dynamodb.Table.return_value = mock_table
+
+        import importlib, src.database as db_module
+        importlib.reload(db_module)
+
+        with patch.object(db_module, "get_dynamodb", return_value=mock_dynamodb):
+            db_module.create_tables()
+
+        user_call = mock_dynamodb.create_table.call_args_list[0]
+        gsi = user_call.kwargs.get("GlobalSecondaryIndexes", [])
+        assert gsi == []
 
     def test_work_table_has_pk_and_sk_key_schema(self, monkeypatch):
         """Workテーブルの KeySchema に PK(HASH) と SK(RANGE) が含まれること"""
@@ -188,8 +210,8 @@ class TestCreateTables:
         assert {"AttributeName": "PK", "KeyType": "HASH"}  in key_schema
         assert {"AttributeName": "SK", "KeyType": "RANGE"} in key_schema
 
-    def test_user_table_has_email_gsi(self, monkeypatch):
-        """Userテーブルに email-index GSI が定義されていること"""
+    def test_work_table_has_pk_attribute_definition(self, monkeypatch):
+        """Workテーブルの AttributeDefinitions に PK が含まれること"""
         monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
         monkeypatch.setenv("WORK_TABLE_NAME", "kintai-works")
         monkeypatch.setenv("ENV",             "development")
@@ -205,9 +227,7 @@ class TestCreateTables:
         with patch.object(db_module, "get_dynamodb", return_value=mock_dynamodb):
             db_module.create_tables()
 
-        user_call = mock_dynamodb.create_table.call_args_list[0]
-        gsi_names = [
-            g["IndexName"]
-            for g in user_call.kwargs.get("GlobalSecondaryIndexes", [])
-        ]
-        assert "email-index" in gsi_names
+        work_call = mock_dynamodb.create_table.call_args_list[1]
+        attr_names = [a["AttributeName"] for a in work_call.kwargs["AttributeDefinitions"]]
+        assert "PK" in attr_names
+        assert "SK" in attr_names

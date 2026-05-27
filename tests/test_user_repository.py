@@ -58,6 +58,40 @@ class TestGetUser:
         assert "password_hash" not in result
 
 
+# ─── get_user_by_name のテスト ───────────────────────────────────────
+
+class TestGetUserByName:
+    def test_returns_item_when_found(self, monkeypatch):
+        """PK=USER#user_name でヒットしたとき最初のアイテムを返すこと"""
+        monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
+
+        mock_table, mock_dynamodb = _make_mock_table()
+        mock_table.query.return_value = {
+            "Items": [{"PK": "USER#admin", "user_id": "u1", "name": "Admin"}]
+        }
+
+        with patch("boto3.resource", return_value=mock_dynamodb):
+            result = user_repository.get_user_by_name("admin")
+
+        assert result is not None
+        assert result["name"] == "Admin"
+        # PK: USER#admin でクエリされること
+        call_kwargs = mock_table.query.call_args.kwargs
+        assert "KeyConditionExpression" in call_kwargs
+
+    def test_returns_none_when_not_found(self, monkeypatch):
+        """該当ユーザーが存在しない場合は None を返すこと"""
+        monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
+
+        mock_table, mock_dynamodb = _make_mock_table()
+        mock_table.query.return_value = {"Items": []}
+
+        with patch("boto3.resource", return_value=mock_dynamodb):
+            result = user_repository.get_user_by_name("unknown")
+
+        assert result is None
+
+
 # ─── update_user のテスト ─────────────────────────────────────────────
 
 class TestUpdateUser:

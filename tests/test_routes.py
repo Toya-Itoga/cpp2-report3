@@ -3,10 +3,18 @@
 import os
 import pytest
 
-os.environ["ENV"] = "development"
-
 from fastapi.testclient import TestClient
 from src.main import app
+from src.services import auth_service
+
+# テスト用ダミーユーザーで認証をバイパスする（全ルートテスト共通）
+_TEST_USER = {
+    "user_id":      "test_user",
+    "name":         "テストユーザー",
+    "email":        "test@kintai.app",
+    "yen_per_hour": 1500,
+}
+app.dependency_overrides[auth_service.get_current_user] = lambda: _TEST_USER
 
 client = TestClient(app, follow_redirects=True)
 
@@ -82,15 +90,14 @@ def test_clock_out_redirects():
 
 
 def test_unauthenticated_redirects_to_login():
-    """Cookie なし（本番モード）のリクエストは /auth/login にリダイレクトされること"""
-    import src.services.auth_service as auth_svc
-
-    original_env = auth_svc.ENV
-    auth_svc.ENV = "production"
+    """Cookie なしのリクエストは /auth/login にリダイレクトされること"""
+    # dependency_overrides を一時的に解除して本来の認証フローをテストする
+    saved = app.dependency_overrides.copy()
+    app.dependency_overrides.clear()
     try:
-        prod_client = TestClient(app, follow_redirects=False)
-        r = prod_client.get("/dashboard")
+        unauthed = TestClient(app, follow_redirects=False)
+        r = unauthed.get("/dashboard")
         assert r.status_code == 303
         assert "/auth/login" in r.headers["location"]
     finally:
-        auth_svc.ENV = original_env
+        app.dependency_overrides.update(saved)

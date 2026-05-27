@@ -2,8 +2,7 @@
 
 import os
 import pytest
-
-os.environ["ENV"] = "development"
+from unittest.mock import patch
 
 from src.services.auth_service import (
     hash_password,
@@ -76,16 +75,37 @@ class TestJWT:
 
 
 class TestAuthenticate:
-    def test_development_falls_back_to_dummy_when_dynamodb_unavailable(self):
-        """ENV=development で DynamoDB に接続できない場合はダミーユーザーを返すこと
-        （USER_TABLE_NAME 未設定 → RuntimeError → DUMMY_USER フォールバック）"""
-        user = authenticate("any@example.com", "any")
-        assert user == DUMMY_USER
+    def test_returns_none_when_dynamodb_unavailable(self):
+        """DynamoDB に接続できない場合（USER_TABLE_NAME 未設定）は None を返すこと"""
+        result = authenticate("any_user", "any_password")
+        assert result is None
 
-    def test_dummy_user_has_required_fields(self):
-        """ダミーユーザーが必要なフィールドを持っていること"""
-        user = authenticate("", "")
-        assert "user_id"      in user
-        assert "name"         in user
-        assert "email"        in user
-        assert "yen_per_hour" in user
+    def test_returns_none_when_user_not_found(self, monkeypatch):
+        """DynamoDB にユーザーが存在しない場合は None を返すこと"""
+        monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
+        with patch("src.repositories.user_repository.get_user_by_name", return_value=None):
+            result = authenticate("nonexistent", "any_password")
+        assert result is None
+
+    def test_returns_none_when_password_mismatch(self, monkeypatch):
+        """パスワードが一致しない場合は None を返すこと"""
+        import bcrypt as _bcrypt
+        hashed = _bcrypt.hashpw(b"correct", _bcrypt.gensalt()).decode()
+        user_data = {"user_id": "u1", "password": hashed, "name": "Alice", "yen_per_hour": 1500}
+
+        monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
+        with patch("src.repositories.user_repository.get_user_by_name", return_value=user_data):
+            result = authenticate("alice", "wrong_password")
+        assert result is None
+
+    def test_returns_user_when_credentials_valid(self, monkeypatch):
+        """ユーザー名とパスワードが正しい場合はユーザー情報を返すこと"""
+        import bcrypt as _bcrypt
+        hashed = _bcrypt.hashpw(b"correct", _bcrypt.gensalt()).decode()
+        user_data = {"user_id": "u1", "password": hashed, "name": "Alice", "yen_per_hour": 1500}
+
+        monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
+        with patch("src.repositories.user_repository.get_user_by_name", return_value=user_data):
+            result = authenticate("alice", "correct")
+        assert result is not None
+        assert result["user_id"] == "u1"
