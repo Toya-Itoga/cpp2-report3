@@ -84,7 +84,7 @@ class TestAuthenticate:
     def test_returns_none_when_user_not_found(self, monkeypatch):
         """DynamoDB にユーザーが存在しない場合は None を返すこと"""
         monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
-        with patch("src.repositories.user_repository.get_user_by_name", return_value=None):
+        with patch("repositories.user_repository.get_user_by_name", return_value=None):
             result = authenticate("nonexistent", "any_password")
         assert result is None
 
@@ -95,7 +95,7 @@ class TestAuthenticate:
         user_data = {"user_id": "u1", "password": hashed, "name": "Alice", "yen_per_hour": 1500}
 
         monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
-        with patch("src.repositories.user_repository.get_user_by_name", return_value=user_data):
+        with patch("repositories.user_repository.get_user_by_name", return_value=user_data):
             result = authenticate("alice", "wrong_password")
         assert result is None
 
@@ -106,7 +106,7 @@ class TestAuthenticate:
         user_data = {"user_id": "u1", "password": hashed, "name": "Alice", "yen_per_hour": 1500}
 
         monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
-        with patch("src.repositories.user_repository.get_user_by_name", return_value=user_data):
+        with patch("repositories.user_repository.get_user_by_name", return_value=user_data):
             result = authenticate("alice", "correct")
         assert result is not None
         assert result["user_id"] == "u1"

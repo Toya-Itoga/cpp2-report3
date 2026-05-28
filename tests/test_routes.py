@@ -5,7 +5,9 @@ import pytest
 
 from fastapi.testclient import TestClient
 from src.main import app
-from src.services import auth_service
+# src/__init__.py が src/ を sys.path に追加するため、
+# アプリが使う services モジュールを直接インポートできる
+import services.auth_service as auth_service
 
 # テスト用ダミーユーザーで認証をバイパスする（全ルートテスト共通）
 _TEST_USER = {
