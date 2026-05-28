@@ -32,7 +32,7 @@ _FALLBACK_USER_FIELDS: dict = {
 def get_user(user_name: str, user_id: str) -> dict:
     """PK(USER#user_name) + SK(user_id) で get_item してユーザーを取得する。存在しない場合はフォールバックを返す"""
     table = _get_table()
-    response = table.get_item(Key={"PK": f"USER#{user_name}", "user_id": user_id})
+    response = table.get_item(Key={"PK": f"USER#{user_name}", "SK": user_id})
     item = response.get("Item")
     if item:
         return item
@@ -89,7 +89,7 @@ def update_user(
         return
 
     update_kwargs: dict = {
-        "Key":                       {"PK": f"USER#{user_name}", "user_id": user_id},
+        "Key":                       {"PK": f"USER#{user_name}", "SK": user_id},
         "UpdateExpression":          "SET " + ", ".join(expressions),
         "ExpressionAttributeValues": attr_values,
     }

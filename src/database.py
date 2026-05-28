@@ -53,12 +53,12 @@ def _user_table_definition(table_name: str) -> dict:
     return {
         "TableName": table_name,
         "AttributeDefinitions": [
-            {"AttributeName": "PK",      "AttributeType": "S"},
-            {"AttributeName": "user_id", "AttributeType": "S"},
+            {"AttributeName": "PK", "AttributeType": "S"},
+            {"AttributeName": "SK", "AttributeType": "S"},
         ],
         "KeySchema": [
-            {"AttributeName": "PK",      "KeyType": "HASH"},
-            {"AttributeName": "user_id", "KeyType": "RANGE"},
+            {"AttributeName": "PK", "KeyType": "HASH"},
+            {"AttributeName": "SK", "KeyType": "RANGE"},
         ],
         "BillingMode": "PAY_PER_REQUEST",
     }
