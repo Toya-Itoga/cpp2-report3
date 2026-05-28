@@ -16,7 +16,7 @@ import bcrypt
 import jwt
 from fastapi import HTTPException, Request
 
-from src.repositories import user_repository
+from repositories import user_repository
 
 # ─── 環境設定 ─────────────────────────────────────────────────────────────
 ENV            = os.getenv("ENV", "development")

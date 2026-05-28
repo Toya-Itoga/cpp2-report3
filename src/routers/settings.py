@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, Form, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from src.repositories import user_repository, work_repository
-from src.routers.auth import get_current_user
-from src.services import auth_service, work_service
-from src.utils.salary import format_currency
+from repositories import user_repository, work_repository
+from routers.auth import get_current_user
+from services import auth_service, work_service
+from utils.salary import format_currency
 
 router = APIRouter(prefix="/settings", tags=["settings"])
 templates = Jinja2Templates(directory="src/templates")

@@ -10,8 +10,8 @@ from fastapi import APIRouter, Depends, Form, Request, Response
 from fastapi.responses import HTMLResponse, RedirectResponse
 from fastapi.templating import Jinja2Templates
 
-from src.services import auth_service
-from src.utils.salary import format_currency
+from services import auth_service
+from utils.salary import format_currency
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 templates = Jinja2Templates(directory="src/templates")

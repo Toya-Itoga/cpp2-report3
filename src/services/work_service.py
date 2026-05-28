@@ -3,7 +3,7 @@
 from datetime import datetime
 from decimal import Decimal
 
-from src.utils.salary import calc_estimated_salary
+from utils.salary import calc_estimated_salary
 
 # 所定労働時間（分）: 8時間
 STANDARD_WORK_MINUTES = 8 * 60

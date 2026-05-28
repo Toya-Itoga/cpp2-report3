@@ -1,7 +1,7 @@
 """DynamoDB接続とテーブル定義を集約するモジュール
 
 使い方:
-    from src.database import get_dynamodb, create_tables
+    from database import get_dynamodb, create_tables
 
     # テーブルリソースを取得する
     dynamodb = get_dynamodb()

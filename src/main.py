@@ -9,8 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
 from mangum import Mangum
 
-from src.routers import auth, dashboard, punch, history, settings
-from src.utils.salary import format_currency
+from routers import auth, dashboard, punch, history, settings
+from utils.salary import format_currency
 
 # ─── アプリ初期化 ───────────────────────────────────────────────────
 app = FastAPI(title="Kintai")

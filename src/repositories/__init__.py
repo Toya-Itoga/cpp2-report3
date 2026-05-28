@@ -1,1 +1,1 @@
-from src.repositories import user_repository, work_repository
+from repositories import user_repository, work_repository
