@@ -143,8 +143,8 @@ class TestCreateTables:
             with pytest.raises(ClientError):
                 db_module.create_tables()
 
-    def test_user_table_has_pk_and_user_id_key_schema(self, monkeypatch):
-        """Userテーブルの KeySchema に PK(HASH) と user_id(RANGE) が含まれること"""
+    def test_user_table_has_pk_and_sk_key_schema(self, monkeypatch):
+        """Userテーブルの KeySchema に PK(HASH) と SK(RANGE) が含まれること"""
         monkeypatch.setenv("USER_TABLE_NAME", "kintai-users")
         monkeypatch.setenv("WORK_TABLE_NAME", "kintai-works")
         monkeypatch.setenv("ENV",             "development")
@@ -164,7 +164,7 @@ class TestCreateTables:
         user_call  = mock_dynamodb.create_table.call_args_list[0]
         key_schema = user_call.kwargs["KeySchema"]
         assert {"AttributeName": "PK",      "KeyType": "HASH"}  in key_schema
-        assert {"AttributeName": "user_id", "KeyType": "RANGE"} in key_schema
+        assert {"AttributeName": "SK",      "KeyType": "RANGE"} in key_schema
 
     def test_user_table_has_no_gsi(self, monkeypatch):
         """Userテーブルに GSI が定義されていないこと（email-index 削除済み）"""

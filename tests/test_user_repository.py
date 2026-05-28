@@ -31,7 +31,7 @@ class TestGetUser:
         assert result["yen_per_hour"] == 2000
         # PK と SK の両方がキーに含まれること
         call_kwargs = mock_table.get_item.call_args.kwargs
-        assert call_kwargs["Key"] == {"PK": "USER#alice", "user_id": "u1"}
+        assert call_kwargs["Key"] == {"PK": "USER#alice", "SK": "u1"}
 
     def test_returns_fallback_when_not_found(self, monkeypatch):
         """DynamoDB にユーザーが存在しない場合はフォールバックを返すこと"""
