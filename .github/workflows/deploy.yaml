@@ -10,19 +10,9 @@ jobs:
       - name: コードをチェックアウト
         uses: actions/checkout@v4
 
-      - name: Pythonをセットアップ
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: 依存ライブラリをインストール
-        run: |
-          pip install -r requirements.txt -t ./package
-
       - name: ZIPを作成
         run: |
-          cp -r src/ ./package/
-          cd package
+          cd src
           zip -r ../function.zip .
 
       - name: AWSの認証
