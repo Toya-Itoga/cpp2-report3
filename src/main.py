@@ -15,11 +15,14 @@ from utils.salary import format_currency
 # ─── アプリ初期化 ───────────────────────────────────────────────────
 app = FastAPI(title="Kintai")
 
+# __file__ 基準の絶対パスを使うことでローカルと Lambda の両方で解決する
+_BASE = os.path.dirname(os.path.abspath(__file__))
+
 # 静的ファイル
-app.mount("/static", StaticFiles(directory="src/static"), name="static")
+app.mount("/static", StaticFiles(directory=os.path.join(_BASE, "static")), name="static")
 
 # Jinja2テンプレート設定
-templates = Jinja2Templates(directory="src/templates")
+templates = Jinja2Templates(directory=os.path.join(_BASE, "templates"))
 templates.env.filters["format_currency"] = format_currency
 
 # ─── ルーター登録 ────────────────────────────────────────────────────

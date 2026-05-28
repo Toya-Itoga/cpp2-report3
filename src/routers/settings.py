@@ -14,7 +14,8 @@ from services import auth_service, work_service
 from utils.salary import format_currency
 
 router = APIRouter(prefix="/settings", tags=["settings"])
-templates = Jinja2Templates(directory="src/templates")
+_TMPL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "templates")
+templates = Jinja2Templates(directory=_TMPL)
 templates.env.filters["format_currency"] = format_currency
 
 USER_TABLE_NAME = os.getenv("USER_TABLE_NAME")

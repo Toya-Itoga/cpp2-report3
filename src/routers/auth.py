@@ -1,3 +1,4 @@
+import os
 """認証ルーター
 
 トークン生成・検証・ユーザー認証の実装は src/services/auth_service.py に委譲する。
@@ -14,7 +15,8 @@ from services import auth_service
 from utils.salary import format_currency
 
 router = APIRouter(prefix="/auth", tags=["auth"])
-templates = Jinja2Templates(directory="src/templates")
+_TMPL = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "templates")
+templates = Jinja2Templates(directory=_TMPL)
 templates.env.filters["format_currency"] = format_currency
 
 # 他ルーターから Depends(get_current_user) として参照できるようエクスポートする
