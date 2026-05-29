@@ -23,11 +23,13 @@
 ## データ構造
 
 ### Userテーブル
-- PK: USER#user_id
+- PK: USER#user_name
+- SK: user_id
 - attributes:
+  - user_name: ユーザー名
   - user_id: ユーザーID
-  - name: 氏名
   - email: メールアドレス
+  - password: ハッシュ化されたパスワード
   - yen_per_hour: 時給
   - created_at: 作成日時
 
