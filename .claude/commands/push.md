@@ -1,4 +1,4 @@
-# /deploy
+# /push
 
 GitHubにpushする。
 
