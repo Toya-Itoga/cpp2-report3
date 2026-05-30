@@ -3,7 +3,10 @@
 import os
 import calendar
 from decimal import Decimal
-from datetime import date, datetime
+from datetime import date, datetime, timezone, timedelta
+
+# Lambda実行環境はUTCのため、日本時間（JST）に変換する
+JST = timezone(timedelta(hours=9))
 
 from fastapi import APIRouter, Depends, Request
 from fastapi.responses import HTMLResponse, RedirectResponse
@@ -28,10 +31,10 @@ WEEKDAY_JA = ["月", "火", "水", "木", "金", "土", "日"]
 # ─── ヘルパー ─────────────────────────────────────────────────────────
 
 def _elapsed_label(clock_in_str: str | None) -> str | None:
-    """出勤時刻（HH:MM）から現在までの経過時間ラベルを返す"""
+    """出勤時刻（HH:MM）から現在までの経過時間ラベルを返す（JST基準）"""
     if not clock_in_str:
         return None
-    now = datetime.now()
+    now = datetime.now(JST)
     h, m = map(int, clock_in_str.split(":"))
     start = now.replace(hour=h, minute=m, second=0, microsecond=0)
     diff = max(0, int((now - start).total_seconds()))
@@ -82,43 +85,6 @@ def _build_daily_bars(
     return bars
 
 
-def _build_recent_records(records: list[dict]) -> list[dict]:
-    """月次レコードから直近5件を整形して返す（新しい順）。
-    SK 昇順で返ってくるため逆順にして先頭5件を取得する。
-    """
-    sorted_records = sorted(records, key=lambda r: r.get("SK", ""), reverse=True)[:5]
-
-    result = []
-    for r in sorted_records:
-        sk = r.get("SK", "")
-        if not sk.startswith("WORK#"):
-            continue
-        date_str = sk[5:]  # YYYYMMDD
-        d = date(int(date_str[:4]), int(date_str[4:6]), int(date_str[6:8]))
-        ci     = r.get("clock_in")
-        co     = r.get("clock_out")
-        status = r.get("status", "")
-
-        if status == "休日":
-            duration_label = "休"
-        elif ci and co:
-            wm = int(Decimal(str(r.get("work_minutes") or 0)))
-            h, m = divmod(wm, 60)
-            duration_label = f"{h}h {m:02d}m"
-        elif ci and not co:
-            duration_label = "出勤中"
-        else:
-            duration_label = "休"
-
-        result.append({
-            "date_label":     f"{d.month}/{d.day} ({WEEKDAY_JA[d.weekday()]})",
-            "clock_in":       ci,
-            "clock_out":      co,
-            "duration_label": duration_label,
-        })
-    return result
-
-
 # ─── ルート ───────────────────────────────────────────────────────────
 
 @router.get("/", response_class=HTMLResponse)
@@ -128,7 +94,7 @@ async def root():
 
 @router.get("/dashboard", response_class=HTMLResponse)
 async def dashboard(request: Request, user: dict = Depends(get_current_user)):
-    today = date.today()
+    today = datetime.now(JST).date()
     today_label = f"{today.year}年{today.month}月{today.day}日（{WEEKDAY_JA[today.weekday()]}）"
 
     # ─── DynamoDB からデータを取得する ────────────────────────────────
@@ -162,14 +128,13 @@ async def dashboard(request: Request, user: dict = Depends(get_current_user)):
     }
 
     return templates.TemplateResponse(request, "dashboard.html", {
-        "user":           user,
-        "active":         "dashboard",
-        "today_label":    today_label,
-        "today_status":   today_status,
-        "clock_in":       clock_in,
-        "clock_out":      clock_out,
-        "elapsed":        elapsed,
-        "monthly":        monthly,
-        "daily_bars":     _build_daily_bars(monthly_records, today.year, today.month),
-        "recent_records": _build_recent_records(monthly_records),
+        "user":         user,
+        "active":       "dashboard",
+        "today_label":  today_label,
+        "today_status": today_status,
+        "clock_in":     clock_in,
+        "clock_out":    clock_out,
+        "elapsed":      elapsed,
+        "monthly":      monthly,
+        "daily_bars":   _build_daily_bars(monthly_records, today.year, today.month),
     })

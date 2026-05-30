@@ -82,44 +82,23 @@
     </div>
   </div>
 
-  <!-- 下段：棒グラフ + 直近勤務 -->
-  <div style="display: grid; grid-template-columns: 1fr 420px; gap: 24px;">
-
-    <!-- 日別勤務時間グラフ -->
-    <div class="card" style="padding: 18px 24px; display: flex; flex-direction: column; gap: 10px; height: 240px;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 16px; font-weight: 700;">今月の勤務時間</span>
-        <span style="font-size: 12px; color: var(--ink3); font-style: italic;">日別 (時間)</span>
-      </div>
-      <div class="bar-chart" style="align-items: flex-end; flex: 1; padding-top: 8px;">
-        {% for bar in daily_bars %}
-        <div class="bar-chart__bar">
-          <div
-            class="bar-chart__fill {% if bar.accent %}bar-chart__fill--accent{% endif %}"
-            style="height: {{ bar.height_px }}px;"
-          ></div>
-          <span class="bar-chart__label">{{ bar.label }}</span>
-        </div>
-        {% endfor %}
-      </div>
+  <!-- 下段：日別勤務時間グラフ（全幅） -->
+  <div class="card" style="padding: 18px 24px; display: flex; flex-direction: column; gap: 10px; height: 240px;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-size: 16px; font-weight: 700;">今月の勤務時間</span>
+      <span style="font-size: 12px; color: var(--ink3); font-style: italic;">日別 (時間)</span>
     </div>
-
-    <!-- 直近の勤務 -->
-    <div class="card" style="padding: 18px 22px; display: flex; flex-direction: column; gap: 8px; height: 240px;">
-      <div style="display: flex; justify-content: space-between; align-items: center;">
-        <span style="font-size: 16px; font-weight: 700;">直近の勤務</span>
-        <a href="/history" style="font-size: 12px; color: var(--ink3); font-style: italic; text-decoration: none; border-bottom: 1px solid var(--ink3);">もっと見る →</a>
-      </div>
-      {% for r in recent_records %}
-      <div style="display: grid; grid-template-columns: 90px 60px 60px 1fr; gap: 8px; padding: 4px 0; {% if not loop.last %}border-bottom: 1px dashed var(--ink3);{% endif %}">
-        <span style="font-size: 13px; color: var(--ink2);">{{ r.date_label }}</span>
-        <span style="font-size: 13px;">{{ r.clock_in or "--" }}</span>
-        <span style="font-size: 13px;">{{ r.clock_out or "--" }}</span>
-        <span style="font-size: 13px; font-weight: 700; text-align: right;">{{ r.duration_label }}</span>
+    <div class="bar-chart" style="align-items: flex-end; flex: 1; padding-top: 8px;">
+      {% for bar in daily_bars %}
+      <div class="bar-chart__bar">
+        <div
+          class="bar-chart__fill {% if bar.accent %}bar-chart__fill--accent{% endif %}"
+          style="height: {{ bar.height_px }}px;"
+        ></div>
+        <span class="bar-chart__label">{{ bar.label }}</span>
       </div>
       {% endfor %}
     </div>
-
   </div>
 </div>
 {% endblock %}
