@@ -1,7 +1,10 @@
 """打刻ルーター"""
 
 import os
-from datetime import date, datetime  # datetime は clock_in/clock_out エンドポイントで使用
+from datetime import datetime, timezone, timedelta
+
+# Lambda実行環境はUTCのため、日本時間（JST）に変換する
+JST = timezone(timedelta(hours=9))
 
 import boto3
 from botocore.exceptions import ClientError
@@ -31,7 +34,7 @@ if WORK_TABLE_NAME:
 
 @router.get("", response_class=HTMLResponse)
 async def punch_page(request: Request, user: dict = Depends(get_current_user)):
-    today = date.today()
+    today = datetime.now(JST).date()
     weekday_ja = ["月", "火", "水", "木", "金", "土", "日"]
     date_label = f"{today.year}年 {today.month}月 {today.day}日 ({weekday_ja[today.weekday()]})"
 
@@ -63,9 +66,10 @@ async def punch_page(request: Request, user: dict = Depends(get_current_user)):
 
 @router.post("/clock-in")
 async def clock_in(request: Request, user: dict = Depends(get_current_user)):
-    """出勤打刻処理: 現在時刻を WORK#YYYYMMDD レコードに書き込む"""
-    time_str = datetime.now().strftime("%H:%M")
-    today    = date.today()
+    """出勤打刻処理: 現在時刻（JST）を WORK#YYYYMMDD レコードに書き込む"""
+    now      = datetime.now(JST)
+    time_str = now.strftime("%H:%M")
+    today    = now.date()
 
     if WORK_TABLE_NAME:
         try:
@@ -80,9 +84,10 @@ async def clock_in(request: Request, user: dict = Depends(get_current_user)):
 
 @router.post("/clock-out")
 async def clock_out(request: Request, user: dict = Depends(get_current_user)):
-    """退勤打刻処理: clock_in との差分から work_minutes・overtime_minutes を算出して更新する"""
-    time_str = datetime.now().strftime("%H:%M")
-    today    = date.today()
+    """退勤打刻処理: 現在時刻（JST）を用いて work_minutes・overtime_minutes を算出して更新する"""
+    now      = datetime.now(JST)
+    time_str = now.strftime("%H:%M")
+    today    = now.date()
 
     if WORK_TABLE_NAME:
         record = work_repository.get_record(user["user_id"], today)

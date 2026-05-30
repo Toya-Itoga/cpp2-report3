@@ -1,7 +1,10 @@
 """勤務関連のビジネスロジックを定義するサービス"""
 
-from datetime import datetime
+from datetime import datetime, timezone, timedelta
 from decimal import Decimal
+
+# Lambda実行環境はUTCのため、日本時間（JST）に変換する
+JST = timezone(timedelta(hours=9))
 
 from utils.salary import calc_estimated_salary
 
@@ -89,12 +92,12 @@ def aggregate_monthly(records: list[dict], yen_per_hour: int) -> dict:
 
 def format_elapsed(clock_in: str) -> str:
     """
-    出勤時刻（HH:MM）から現在までの経過時間を "Xh YYm" 形式で返す。
+    出勤時刻（HH:MM）から現在までの経過時間を "Xh YYm" 形式で返す（JST基準）。
     出勤していない場合は空文字を返す。
     """
     if not clock_in:
         return ""
-    now = datetime.now()
+    now = datetime.now(JST)
     h, m = map(int, clock_in.split(":"))
     start = now.replace(hour=h, minute=m, second=0, microsecond=0)
     diff = max(0, int((now - start).total_seconds()))
