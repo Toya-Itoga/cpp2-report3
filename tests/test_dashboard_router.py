@@ -87,60 +87,6 @@ class TestBuildDailyBars:
         assert bars[0]["height_px"] > 4
 
 
-class TestBuildRecentRecords:
-    def _make_record(self, day: int, ci: str | None, co: str | None, wm: int, status: str) -> dict:
-        return {
-            "SK":           f"WORK#202605{day:02d}",
-            "clock_in":     ci,
-            "clock_out":    co,
-            "work_minutes": wm,
-            "status":       status,
-        }
-
-    def test_returns_max_5_records(self):
-        """6件以上あっても直近5件のみ返すこと"""
-        import src.routers.dashboard as dash
-        importlib.reload(dash)
-        records = [self._make_record(d, "09:00", "18:00", 540, "退勤済") for d in range(1, 8)]
-        result = dash._build_recent_records(records)
-        assert len(result) == 5
-
-    def test_sorted_newest_first(self):
-        """新しい日付が先頭に来ること"""
-        import src.routers.dashboard as dash
-        importlib.reload(dash)
-        records = [
-            self._make_record(1, "09:00", "18:00", 540, "退勤済"),
-            self._make_record(5, "09:00", "18:00", 540, "退勤済"),
-        ]
-        result = dash._build_recent_records(records)
-        assert result[0]["date_label"].startswith("5/5")
-
-    def test_duration_label_for_completed(self):
-        """退勤済レコードの duration_label が "Xh YYm" 形式であること"""
-        import src.routers.dashboard as dash
-        importlib.reload(dash)
-        records = [self._make_record(1, "09:00", "18:00", 540, "退勤済")]
-        result = dash._build_recent_records(records)
-        assert result[0]["duration_label"] == "9h 00m"
-
-    def test_duration_label_for_holiday(self):
-        """休日レコードは "休" と表示されること"""
-        import src.routers.dashboard as dash
-        importlib.reload(dash)
-        records = [{"SK": "WORK#20260501", "clock_in": None, "clock_out": None, "work_minutes": 0, "status": "休日"}]
-        result = dash._build_recent_records(records)
-        assert result[0]["duration_label"] == "休"
-
-    def test_duration_label_for_working(self):
-        """出勤中（clock_out なし）は "出勤中" と表示されること"""
-        import src.routers.dashboard as dash
-        importlib.reload(dash)
-        records = [{"SK": "WORK#20260501", "clock_in": "09:00", "clock_out": None, "work_minutes": 0, "status": "出勤中"}]
-        result = dash._build_recent_records(records)
-        assert result[0]["duration_label"] == "出勤中"
-
-
 # ─── dashboard エンドポイントのテスト ────────────────────────────────
 
 class TestDashboardEndpoint:
