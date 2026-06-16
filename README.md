@@ -86,7 +86,7 @@
 └── requirements.txt
 ```
 
----
-
 ## システム構成図
 ![システム構成図](docs/app-configurationdiagram.png)
+
+---
